@@ -108,6 +108,18 @@ export default function RepoView({ repoPath }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]);
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const isReloadKey = e.key === "F5" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r");
+      if (isReloadKey) {
+        e.preventDefault();
+        runAction(refreshAll);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [refreshAll]);
+
   async function handleSelect(sel: Selection) {
     setSelection(sel);
     setSelectedFile(null);
@@ -201,6 +213,10 @@ export default function RepoView({ repoPath }: Props) {
       <TopBar
         status={status}
         busy={busy}
+        onRefresh={() => runAction(async () => {
+          await refreshAll();
+          setInfo("Refreshed");
+        })}
         onFetch={() => runAction(async () => {
           await api.fetch(repoPath);
           await refreshAll();

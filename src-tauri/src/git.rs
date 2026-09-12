@@ -652,8 +652,12 @@ pub fn unstage_all(repo_path: String) -> Result<(), String> {
     let repo = open_repo(&repo_path)?;
     let head = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
     if let Some(commit) = head {
-        repo.reset_default(Some(commit.as_object()), Vec::<String>::new().iter())
+        repo.reset_default(Some(commit.as_object()), ["*"].iter())
             .map_err(|e| e.to_string())?;
+    } else {
+        let mut index = repo.index().map_err(|e| e.to_string())?;
+        index.clear().map_err(|e| e.to_string())?;
+        index.write().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
