@@ -2,24 +2,9 @@ use git2::{BranchType, Cred, CredentialType, DiffOptions, Repository, StatusOpti
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
-pub struct AppState {
-    pub repo_path: Mutex<Option<PathBuf>>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        AppState {
-            repo_path: Mutex::new(None),
-        }
-    }
-}
-
-fn open_repo(state: &tauri::State<AppState>) -> Result<Repository, String> {
-    let guard = state.repo_path.lock().map_err(|e| e.to_string())?;
-    let path = guard.as_ref().ok_or_else(|| "No repository open".to_string())?;
-    Repository::open(path).map_err(|e| e.to_string())
+fn open_repo(repo_path: &str) -> Result<Repository, String> {
+    Repository::open(repo_path).map_err(|e| e.to_string())
 }
 
 fn remote_callbacks<'a>() -> git2::RemoteCallbacks<'a> {
@@ -301,12 +286,14 @@ fn status_char(status: git2::Status, staged: bool) -> Option<&'static str> {
 }
 
 // ---------- Commands ----------
+//
+// Every command takes `repo_path` explicitly rather than relying on shared
+// app state, so the frontend can have any number of repos open at once
+// (each tab just remembers its own path) without the backend needing to
+// track which one is "current".
 
 #[tauri::command]
-pub fn open_repository(
-    path: String,
-    state: tauri::State<AppState>,
-) -> Result<RepoSummary, String> {
+pub fn open_repository(path: String) -> Result<RepoSummary, String> {
     let repo = Repository::discover(&path).map_err(|e| e.to_string())?;
     let workdir = repo
         .workdir()
@@ -317,9 +304,6 @@ pub fn open_repository(
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| workdir.to_string_lossy().to_string());
 
-    let mut guard = state.repo_path.lock().map_err(|e| e.to_string())?;
-    *guard = Some(workdir.clone());
-
     Ok(RepoSummary {
         path: workdir.to_string_lossy().to_string(),
         name,
@@ -327,8 +311,8 @@ pub fn open_repository(
 }
 
 #[tauri::command]
-pub fn get_status(state: tauri::State<AppState>) -> Result<RepoStatus, String> {
-    let repo = open_repo(&state)?;
+pub fn get_status(repo_path: String) -> Result<RepoStatus, String> {
+    let repo = open_repo(&repo_path)?;
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)
@@ -397,11 +381,8 @@ pub fn get_status(state: tauri::State<AppState>) -> Result<RepoStatus, String> {
 }
 
 #[tauri::command]
-pub fn get_log(
-    limit: Option<usize>,
-    state: tauri::State<AppState>,
-) -> Result<Vec<CommitInfo>, String> {
-    let repo = open_repo(&state)?;
+pub fn get_log(repo_path: String, limit: Option<usize>) -> Result<Vec<CommitInfo>, String> {
+    let repo = open_repo(&repo_path)?;
     let limit = limit.unwrap_or(500);
 
     let mut oid_to_refs: HashMap<String, Vec<String>> = HashMap::new();
@@ -454,8 +435,8 @@ pub fn get_log(
 }
 
 #[tauri::command]
-pub fn get_branches(state: tauri::State<AppState>) -> Result<Vec<BranchInfo>, String> {
-    let repo = open_repo(&state)?;
+pub fn get_branches(repo_path: String) -> Result<Vec<BranchInfo>, String> {
+    let repo = open_repo(&repo_path)?;
     let head_name = repo
         .head()
         .ok()
@@ -508,8 +489,8 @@ pub fn get_branches(state: tauri::State<AppState>) -> Result<Vec<BranchInfo>, St
 }
 
 #[tauri::command]
-pub fn get_remotes(state: tauri::State<AppState>) -> Result<Vec<RemoteInfo>, String> {
-    let repo = open_repo(&state)?;
+pub fn get_remotes(repo_path: String) -> Result<Vec<RemoteInfo>, String> {
+    let repo = open_repo(&repo_path)?;
     let names = repo.remotes().map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     for name in names.iter().flatten() {
@@ -524,8 +505,8 @@ pub fn get_remotes(state: tauri::State<AppState>) -> Result<Vec<RemoteInfo>, Str
 }
 
 #[tauri::command]
-pub fn get_tags(state: tauri::State<AppState>) -> Result<Vec<TagInfo>, String> {
-    let repo = open_repo(&state)?;
+pub fn get_tags(repo_path: String) -> Result<Vec<TagInfo>, String> {
+    let repo = open_repo(&repo_path)?;
     let mut out = Vec::new();
     repo.tag_foreach(|oid, name| {
         let name = String::from_utf8_lossy(name)
@@ -542,11 +523,8 @@ pub fn get_tags(state: tauri::State<AppState>) -> Result<Vec<TagInfo>, String> {
 }
 
 #[tauri::command]
-pub fn get_commit_diff(
-    commit_id: String,
-    state: tauri::State<AppState>,
-) -> Result<Vec<FileDiff>, String> {
-    let repo = open_repo(&state)?;
+pub fn get_commit_diff(repo_path: String, commit_id: String) -> Result<Vec<FileDiff>, String> {
+    let repo = open_repo(&repo_path)?;
     let oid = git2::Oid::from_str(&commit_id).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(oid).map_err(|e| e.to_string())?;
     let tree = commit.tree().map_err(|e| e.to_string())?;
@@ -569,11 +547,11 @@ pub fn get_commit_diff(
 
 #[tauri::command]
 pub fn get_working_diff(
+    repo_path: String,
     path: String,
     staged: bool,
-    state: tauri::State<AppState>,
 ) -> Result<FileDiff, String> {
-    let repo = open_repo(&state)?;
+    let repo = open_repo(&repo_path)?;
     let mut opts = DiffOptions::new();
     opts.context_lines(3);
     opts.pathspec(&path);
@@ -600,8 +578,8 @@ pub fn get_working_diff(
 }
 
 #[tauri::command]
-pub fn stage_file(path: String, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn stage_file(repo_path: String, path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let mut index = repo.index().map_err(|e| e.to_string())?;
     let full_path = repo.workdir().unwrap().join(&path);
     if full_path.exists() {
@@ -614,8 +592,8 @@ pub fn stage_file(path: String, state: tauri::State<AppState>) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn unstage_file(path: String, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn unstage_file(repo_path: String, path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let head = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
     match head {
         Some(commit) => {
@@ -632,8 +610,8 @@ pub fn unstage_file(path: String, state: tauri::State<AppState>) -> Result<(), S
 }
 
 #[tauri::command]
-pub fn stage_all(state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn stage_all(repo_path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let mut index = repo.index().map_err(|e| e.to_string())?;
     index
         .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
@@ -643,8 +621,8 @@ pub fn stage_all(state: tauri::State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn unstage_all(state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn unstage_all(repo_path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let head = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
     if let Some(commit) = head {
         repo.reset_default(Some(commit.as_object()), Vec::<String>::new().iter())
@@ -654,8 +632,8 @@ pub fn unstage_all(state: tauri::State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn discard_file_changes(path: String, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn discard_file_changes(repo_path: String, path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let mut opts = git2::build::CheckoutBuilder::new();
     opts.path(&path).force();
     repo.checkout_head(Some(&mut opts)).map_err(|e| e.to_string())?;
@@ -663,8 +641,8 @@ pub fn discard_file_changes(path: String, state: tauri::State<AppState>) -> Resu
 }
 
 #[tauri::command]
-pub fn commit(message: String, state: tauri::State<AppState>) -> Result<CommitInfo, String> {
-    let mut repo = open_repo(&state)?;
+pub fn commit(repo_path: String, message: String) -> Result<CommitInfo, String> {
+    let mut repo = open_repo(&repo_path)?;
     let mut index = repo.index().map_err(|e| e.to_string())?;
     if index.has_conflicts() {
         return Err("Cannot commit: unresolved conflicts remain".to_string());
@@ -725,8 +703,8 @@ pub fn commit(message: String, state: tauri::State<AppState>) -> Result<CommitIn
 }
 
 #[tauri::command]
-pub fn checkout_branch(name: String, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn checkout_branch(repo_path: String, name: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let (object, reference) = repo
         .revparse_ext(&name)
         .map_err(|e| e.to_string())?;
@@ -741,12 +719,12 @@ pub fn checkout_branch(name: String, state: tauri::State<AppState>) -> Result<()
 
 #[tauri::command]
 pub fn create_branch(
+    repo_path: String,
     name: String,
     start_point: Option<String>,
     checkout: bool,
-    state: tauri::State<AppState>,
 ) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+    let repo = open_repo(&repo_path)?;
     let target_commit = match start_point {
         Some(sp) => {
             let (obj, _) = repo.revparse_ext(&sp).map_err(|e| e.to_string())?;
@@ -757,18 +735,14 @@ pub fn create_branch(
     repo.branch(&name, &target_commit, false)
         .map_err(|e| e.to_string())?;
     if checkout {
-        checkout_branch(name, state)?;
+        checkout_branch(repo_path, name)?;
     }
     Ok(())
 }
 
 #[tauri::command]
-pub fn delete_branch(
-    name: String,
-    is_remote: bool,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn delete_branch(repo_path: String, name: String, is_remote: bool) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let btype = if is_remote {
         BranchType::Remote
     } else {
@@ -780,8 +754,8 @@ pub fn delete_branch(
 }
 
 #[tauri::command]
-pub fn fetch(remote: Option<String>, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn fetch(repo_path: String, remote: Option<String>) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let remote_name = remote.unwrap_or_else(|| "origin".to_string());
     let mut r = repo.find_remote(&remote_name).map_err(|e| e.to_string())?;
     let mut opts = git2::FetchOptions::new();
@@ -792,8 +766,8 @@ pub fn fetch(remote: Option<String>, state: tauri::State<AppState>) -> Result<()
 }
 
 #[tauri::command]
-pub fn pull(state: tauri::State<AppState>) -> Result<String, String> {
-    let repo = open_repo(&state)?;
+pub fn pull(repo_path: String) -> Result<String, String> {
+    let repo = open_repo(&repo_path)?;
     let head_ref = repo.head().map_err(|e| e.to_string())?;
     let branch_name = head_ref
         .shorthand()
@@ -851,12 +825,12 @@ pub fn pull(state: tauri::State<AppState>) -> Result<String, String> {
 
 #[tauri::command]
 pub fn push(
+    repo_path: String,
     remote: String,
     branch: String,
     set_upstream: bool,
-    state: tauri::State<AppState>,
 ) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+    let repo = open_repo(&repo_path)?;
     let mut r = repo.find_remote(&remote).map_err(|e| e.to_string())?;
     let mut opts = git2::PushOptions::new();
     opts.remote_callbacks(remote_callbacks());
@@ -876,14 +850,8 @@ pub fn push(
 }
 
 #[tauri::command]
-pub fn stash_list(state: tauri::State<AppState>) -> Result<Vec<StashInfo>, String> {
-    let repo_path = state
-        .repo_path
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No repository open")?;
-    let mut repo = Repository::open(repo_path).map_err(|e| e.to_string())?;
+pub fn stash_list(repo_path: String) -> Result<Vec<StashInfo>, String> {
+    let mut repo = open_repo(&repo_path)?;
     let mut out = Vec::new();
     repo.stash_foreach(|index, message, oid| {
         out.push(StashInfo {
@@ -899,17 +867,11 @@ pub fn stash_list(state: tauri::State<AppState>) -> Result<Vec<StashInfo>, Strin
 
 #[tauri::command]
 pub fn stash_save(
+    repo_path: String,
     message: Option<String>,
     include_untracked: bool,
-    state: tauri::State<AppState>,
 ) -> Result<(), String> {
-    let repo_path = state
-        .repo_path
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No repository open")?;
-    let mut repo = Repository::open(repo_path).map_err(|e| e.to_string())?;
+    let mut repo = open_repo(&repo_path)?;
     let sig = repo.signature().map_err(|e| e.to_string())?;
     let flags = if include_untracked {
         git2::StashFlags::INCLUDE_UNTRACKED
@@ -922,40 +884,22 @@ pub fn stash_save(
 }
 
 #[tauri::command]
-pub fn stash_pop(index: usize, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo_path = state
-        .repo_path
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No repository open")?;
-    let mut repo = Repository::open(repo_path).map_err(|e| e.to_string())?;
+pub fn stash_pop(repo_path: String, index: usize) -> Result<(), String> {
+    let mut repo = open_repo(&repo_path)?;
     repo.stash_pop(index, None).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn stash_apply(index: usize, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo_path = state
-        .repo_path
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No repository open")?;
-    let mut repo = Repository::open(repo_path).map_err(|e| e.to_string())?;
+pub fn stash_apply(repo_path: String, index: usize) -> Result<(), String> {
+    let mut repo = open_repo(&repo_path)?;
     repo.stash_apply(index, None).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn stash_drop(index: usize, state: tauri::State<AppState>) -> Result<(), String> {
-    let repo_path = state
-        .repo_path
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or("No repository open")?;
-    let mut repo = Repository::open(repo_path).map_err(|e| e.to_string())?;
+pub fn stash_drop(repo_path: String, index: usize) -> Result<(), String> {
+    let mut repo = open_repo(&repo_path)?;
     repo.stash_drop(index).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -999,8 +943,8 @@ fn ref_name_for_oid(repo: &Repository, oid: git2::Oid) -> Option<String> {
 }
 
 #[tauri::command]
-pub fn get_repo_state(state: tauri::State<AppState>) -> Result<RepoState, String> {
-    let mut repo = open_repo(&state)?;
+pub fn get_repo_state(repo_path: String) -> Result<RepoState, String> {
+    let mut repo = open_repo(&repo_path)?;
 
     let state_str = match repo.state() {
         git2::RepositoryState::Clean => "clean",
@@ -1040,8 +984,8 @@ pub fn get_repo_state(state: tauri::State<AppState>) -> Result<RepoState, String
 }
 
 #[tauri::command]
-pub fn merge_branch(name: String, state: tauri::State<AppState>) -> Result<MergeOutcome, String> {
-    let repo = open_repo(&state)?;
+pub fn merge_branch(repo_path: String, name: String) -> Result<MergeOutcome, String> {
+    let repo = open_repo(&repo_path)?;
     let (obj, _) = repo.revparse_ext(&name).map_err(|e| e.to_string())?;
     let their_commit = obj.peel_to_commit().map_err(|e| e.to_string())?;
     let their_annotated = repo
@@ -1124,8 +1068,8 @@ pub fn merge_branch(name: String, state: tauri::State<AppState>) -> Result<Merge
 }
 
 #[tauri::command]
-pub fn merge_abort(state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn merge_abort(repo_path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let head_commit = repo
         .head()
         .map_err(|e| e.to_string())?
@@ -1179,8 +1123,8 @@ fn drive_rebase(repo: &Repository, rebase: &mut git2::Rebase) -> Result<RebasePr
 }
 
 #[tauri::command]
-pub fn start_rebase(onto: String, state: tauri::State<AppState>) -> Result<RebaseProgress, String> {
-    let repo = open_repo(&state)?;
+pub fn start_rebase(repo_path: String, onto: String) -> Result<RebaseProgress, String> {
+    let repo = open_repo(&repo_path)?;
     let head_ref = repo.head().map_err(|e| e.to_string())?;
     let branch_annotated = repo
         .reference_to_annotated_commit(&head_ref)
@@ -1199,8 +1143,8 @@ pub fn start_rebase(onto: String, state: tauri::State<AppState>) -> Result<Rebas
 }
 
 #[tauri::command]
-pub fn rebase_continue(state: tauri::State<AppState>) -> Result<RebaseProgress, String> {
-    let repo = open_repo(&state)?;
+pub fn rebase_continue(repo_path: String) -> Result<RebaseProgress, String> {
+    let repo = open_repo(&repo_path)?;
     if conflict_count(&repo) > 0 {
         return Err("Resolve all conflicts before continuing the rebase".to_string());
     }
@@ -1220,38 +1164,30 @@ pub fn rebase_continue(state: tauri::State<AppState>) -> Result<RebaseProgress, 
 }
 
 #[tauri::command]
-pub fn rebase_abort(state: tauri::State<AppState>) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn rebase_abort(repo_path: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let mut rebase = repo.open_rebase(None).map_err(|e| e.to_string())?;
     rebase.abort().map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn read_working_file(path: String, state: tauri::State<AppState>) -> Result<String, String> {
-    let repo = open_repo(&state)?;
+pub fn read_working_file(repo_path: String, path: String) -> Result<String, String> {
+    let repo = open_repo(&repo_path)?;
     let full_path = repo.workdir().ok_or("No working directory")?.join(&path);
     std::fs::read_to_string(&full_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn write_working_file(
-    path: String,
-    content: String,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn write_working_file(repo_path: String, path: String, content: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let full_path = repo.workdir().ok_or("No working directory")?.join(&path);
     std::fs::write(&full_path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn reset_to_commit(
-    commit_id: String,
-    mode: String,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn reset_to_commit(repo_path: String, commit_id: String, mode: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let oid = git2::Oid::from_str(&commit_id).map_err(|e| e.to_string())?;
     let object = repo.find_object(oid, None).map_err(|e| e.to_string())?;
     let reset_type = match mode.as_str() {
@@ -1268,12 +1204,8 @@ pub fn reset_to_commit(
 }
 
 #[tauri::command]
-pub fn resolve_conflict(
-    path: String,
-    side: String,
-    state: tauri::State<AppState>,
-) -> Result<(), String> {
-    let repo = open_repo(&state)?;
+pub fn resolve_conflict(repo_path: String, path: String, side: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
     let mut index = repo.index().map_err(|e| e.to_string())?;
     let full_path = repo.workdir().ok_or("No working directory")?.join(&path);
 
@@ -1313,4 +1245,3 @@ pub fn resolve_conflict(
     index.write().map_err(|e| e.to_string())?;
     Ok(())
 }
-
