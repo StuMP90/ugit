@@ -22,9 +22,16 @@ import ConflictView from "./components/ConflictView";
 import MergeRebaseBanner from "./components/MergeRebaseBanner";
 import RepoOpen from "./components/RepoOpen";
 import PromptModal from "./components/PromptModal";
+import ConfirmDialog from "./components/ConfirmDialog";
 import "./App.css";
 
 type Modal = null | "branch" | "stash";
+
+interface ConfirmState {
+  message: string;
+  confirmLabel?: string;
+  onConfirm: () => void;
+}
 
 export default function App() {
   const [repo, setRepo] = useState<RepoSummary | null>(null);
@@ -56,6 +63,11 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+
+  function askConfirm(message: string, onConfirm: () => void, confirmLabel?: string) {
+    setConfirmState({ message, onConfirm, confirmLabel });
+  }
 
   const runAction = useCallback(async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -245,22 +257,29 @@ export default function App() {
               }
             })
           }
-          onAbortRebase={() => {
-            if (!window.confirm("Abort the in-progress rebase and restore the branch to its previous state?"))
-              return;
-            runAction(async () => {
-              await api.rebaseAbort();
-              setRebaseProgress(null);
-              await refreshAll();
-            });
-          }}
-          onAbortMerge={() => {
-            if (!window.confirm("Abort the in-progress merge and discard merge changes?")) return;
-            runAction(async () => {
-              await api.mergeAbort();
-              await refreshAll();
-            });
-          }}
+          onAbortRebase={() =>
+            askConfirm(
+              "Abort the in-progress rebase and restore the branch to its previous state?",
+              () =>
+                runAction(async () => {
+                  await api.rebaseAbort();
+                  setRebaseProgress(null);
+                  await refreshAll();
+                }),
+              "Abort rebase"
+            )
+          }
+          onAbortMerge={() =>
+            askConfirm(
+              "Abort the in-progress merge and discard merge changes?",
+              () =>
+                runAction(async () => {
+                  await api.mergeAbort();
+                  await refreshAll();
+                }),
+              "Abort merge"
+            )
+          }
         />
       )}
 
@@ -287,13 +306,17 @@ export default function App() {
             })
           }
           onCreateBranch={() => setModal("branch")}
-          onDeleteBranch={(name, isRemote) => {
-            if (!window.confirm(`Delete branch "${name}"?`)) return;
-            runAction(async () => {
-              await api.deleteBranch(name, isRemote);
-              await refreshAll();
-            });
-          }}
+          onDeleteBranch={(name, isRemote) =>
+            askConfirm(
+              `Delete branch "${name}"?`,
+              () =>
+                runAction(async () => {
+                  await api.deleteBranch(name, isRemote);
+                  await refreshAll();
+                }),
+              "Delete branch"
+            )
+          }
           onMergeBranch={(name) =>
             runAction(async () => {
               const outcome = await api.mergeBranch(name);
@@ -310,24 +333,23 @@ export default function App() {
               }
             })
           }
-          onRebaseOnto={(name) => {
-            if (
-              !window.confirm(
-                `Rebase the current branch onto '${name}'? This rewrites commit history for the current branch.`
-              )
+          onRebaseOnto={(name) =>
+            askConfirm(
+              `Rebase the current branch onto '${name}'? This rewrites commit history for the current branch.`,
+              () =>
+                runAction(async () => {
+                  const progress = await api.startRebase(name);
+                  setRebaseProgress(progress);
+                  await refreshAll();
+                  if (progress.status === "conflicts") {
+                    setSelection({ kind: "working" });
+                  } else {
+                    setInfo("Rebase complete");
+                  }
+                }),
+              "Rebase"
             )
-              return;
-            runAction(async () => {
-              const progress = await api.startRebase(name);
-              setRebaseProgress(progress);
-              await refreshAll();
-              if (progress.status === "conflicts") {
-                setSelection({ kind: "working" });
-              } else {
-                setInfo("Rebase complete");
-              }
-            });
-          }}
+          }
           onStashApply={(i) =>
             runAction(async () => {
               await api.stashApply(i);
@@ -341,11 +363,12 @@ export default function App() {
             })
           }
           onStashDrop={(i) => {
-            if (!window.confirm("Drop this stash?")) return;
-            runAction(async () => {
-              await api.stashDrop(i);
-              await refreshAll();
-            });
+            askConfirm("Drop this stash?", () =>
+              runAction(async () => {
+                await api.stashDrop(i);
+                await refreshAll();
+              })
+            );
           }}
         />
 
@@ -391,13 +414,17 @@ export default function App() {
                   await refreshWorkingSelection();
                 })
               }
-              onDiscard={(path) => {
-                if (!window.confirm(`Discard changes to "${path}"? This cannot be undone.`)) return;
-                runAction(async () => {
-                  await api.discardFileChanges(path);
-                  await refreshWorkingSelection();
-                });
-              }}
+              onDiscard={(path) =>
+                askConfirm(
+                  `Discard changes to "${path}"? This cannot be undone.`,
+                  () =>
+                    runAction(async () => {
+                      await api.discardFileChanges(path);
+                      await refreshWorkingSelection();
+                    }),
+                  "Discard"
+                )
+              }
               onCommit={(message) => {
                 setCommitting(true);
                 runAction(async () => {
@@ -497,6 +524,19 @@ export default function App() {
               await api.stashSave(msg || null, true);
               await refreshAll();
             });
+          }}
+        />
+      )}
+
+      {confirmState && (
+        <ConfirmDialog
+          message={confirmState.message}
+          confirmLabel={confirmState.confirmLabel}
+          onCancel={() => setConfirmState(null)}
+          onConfirm={() => {
+            const action = confirmState.onConfirm;
+            setConfirmState(null);
+            action();
           }}
         />
       )}

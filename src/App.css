@@ -136,6 +136,23 @@ button {
   cursor: default;
 }
 
+.danger-btn {
+  background: var(--danger);
+  border: none;
+  color: #2a0d12;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 4px;
+}
+.danger-btn:hover {
+  filter: brightness(1.1);
+}
+
+.confirm-message {
+  margin: 0;
+  line-height: 1.4;
+}
+
 .link-btn {
   background: none;
   border: none;
