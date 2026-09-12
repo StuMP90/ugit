@@ -1,10 +1,11 @@
 import { useState } from "react";
-import type { BranchInfo, StashInfo, TagInfo } from "../types";
+import type { BranchInfo, RemoteInfo, StashInfo, TagInfo } from "../types";
 
 interface Props {
   branches: BranchInfo[];
   tags: TagInfo[];
   stashes: StashInfo[];
+  remotes: RemoteInfo[];
   onCheckout: (name: string) => void;
   onCreateBranch: () => void;
   onDeleteBranch: (name: string, isRemote: boolean) => void;
@@ -13,6 +14,7 @@ interface Props {
   onStashApply: (index: number) => void;
   onStashPop: (index: number) => void;
   onStashDrop: (index: number) => void;
+  onAddRemote: () => void;
 }
 
 function Section({
@@ -45,6 +47,7 @@ export default function Sidebar({
   branches,
   tags,
   stashes,
+  remotes,
   onCheckout,
   onCreateBranch,
   onDeleteBranch,
@@ -53,6 +56,7 @@ export default function Sidebar({
   onStashApply,
   onStashPop,
   onStashDrop,
+  onAddRemote,
 }: Props) {
   const local = branches.filter((b) => !b.is_remote);
   const remote = branches.filter((b) => b.is_remote);
@@ -123,6 +127,30 @@ export default function Sidebar({
                 </button>
               </>
             )}
+          </div>
+        ))}
+      </Section>
+
+      <Section
+        title="Remotes"
+        count={remotes.length}
+        action={
+          <button
+            className="icon-btn"
+            title="Add remote"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddRemote();
+            }}
+          >
+            +
+          </button>
+        }
+      >
+        {remotes.map((r) => (
+          <div className="sidebar-item" key={r.name} title={r.url}>
+            <span className="sidebar-item-label">{r.name}</span>
+            <span className="remote-url">{r.url}</span>
           </div>
         ))}
       </Section>

@@ -5,6 +5,7 @@ import type {
   CommitInfo,
   FileDiff,
   RebaseProgress,
+  RemoteInfo,
   RepoState,
   RepoStatus,
   Selection,
@@ -21,6 +22,7 @@ import ConflictView from "./components/ConflictView";
 import MergeRebaseBanner from "./components/MergeRebaseBanner";
 import PromptModal from "./components/PromptModal";
 import ConfirmDialog from "./components/ConfirmDialog";
+import AddRemoteModal from "./components/AddRemoteModal";
 
 type Modal = null | "branch" | "stash";
 
@@ -43,6 +45,7 @@ export default function RepoView({ repoPath }: Props) {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [tags, setTags] = useState<TagInfo[]>([]);
   const [stashes, setStashes] = useState<StashInfo[]>([]);
+  const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
   const [repoState, setRepoState] = useState<RepoState | null>(null);
   const [rebaseProgress, setRebaseProgress] = useState<RebaseProgress | null>(null);
 
@@ -63,6 +66,7 @@ export default function RepoView({ repoPath }: Props) {
   const [committing, setCommitting] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [addRemoteOpen, setAddRemoteOpen] = useState(false);
 
   function askConfirm(message: string, onConfirm: () => void, confirmLabel?: string) {
     setConfirmState({ message, onConfirm, confirmLabel });
@@ -81,13 +85,14 @@ export default function RepoView({ repoPath }: Props) {
   }, []);
 
   const refreshAll = useCallback(async () => {
-    const [s, l, b, t, st, rs] = await Promise.all([
+    const [s, l, b, t, st, rs, rm] = await Promise.all([
       api.getStatus(repoPath),
       api.getLog(repoPath, 500),
       api.getBranches(repoPath),
       api.getTags(repoPath),
       api.stashList(repoPath),
       api.getRepoState(repoPath),
+      api.getRemotes(repoPath),
     ]);
     setStatus(s);
     setCommits(l);
@@ -95,6 +100,7 @@ export default function RepoView({ repoPath }: Props) {
     setTags(t);
     setStashes(st);
     setRepoState(rs);
+    setRemotes(rm);
   }, [repoPath]);
 
   useEffect(() => {
@@ -275,6 +281,8 @@ export default function RepoView({ repoPath }: Props) {
           branches={branches}
           tags={tags}
           stashes={stashes}
+          remotes={remotes}
+          onAddRemote={() => setAddRemoteOpen(true)}
           onCheckout={(name) =>
             runAction(async () => {
               await api.checkoutBranch(repoPath, name);
@@ -534,6 +542,20 @@ export default function RepoView({ repoPath }: Props) {
             const action = confirmState.onConfirm;
             setConfirmState(null);
             action();
+          }}
+        />
+      )}
+
+      {addRemoteOpen && (
+        <AddRemoteModal
+          onCancel={() => setAddRemoteOpen(false)}
+          onConfirm={(name, url) => {
+            setAddRemoteOpen(false);
+            runAction(async () => {
+              await api.addRemote(repoPath, name, url);
+              await refreshAll();
+              setInfo(`Added remote "${name}"`);
+            });
           }}
         />
       )}

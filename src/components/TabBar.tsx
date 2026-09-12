@@ -10,9 +10,10 @@ interface Props {
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onNewTab: () => void;
+  onHelp: () => void;
 }
 
-export default function TabBar({ tabs, activeId, onSelect, onClose, onNewTab }: Props) {
+export default function TabBar({ tabs, activeId, onSelect, onClose, onNewTab, onHelp }: Props) {
   return (
     <div className="tab-bar">
       {tabs.map((tab) => (
@@ -37,6 +38,10 @@ export default function TabBar({ tabs, activeId, onSelect, onClose, onNewTab }: 
       ))}
       <button className="tab-new" title="Open another repository" onClick={onNewTab}>
         +
+      </button>
+      <span className="tab-bar-spacer" />
+      <button className="tab-help" title="Help" onClick={onHelp}>
+        ?
       </button>
     </div>
   );

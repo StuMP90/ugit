@@ -20,6 +20,12 @@ export const api = {
   openRepository: (path: string) =>
     invoke<RepoSummary>("open_repository", { path }),
 
+  initRepository: (path: string) =>
+    invoke<RepoSummary>("init_repository", { path }),
+
+  addRemote: (repoPath: string, name: string, url: string) =>
+    invoke<void>("add_remote", { repoPath, name, url }),
+
   getStatus: (repoPath: string) => invoke<RepoStatus>("get_status", { repoPath }),
 
   getLog: (repoPath: string, limit?: number) =>

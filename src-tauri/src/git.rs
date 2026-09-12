@@ -311,6 +311,31 @@ pub fn open_repository(path: String) -> Result<RepoSummary, String> {
 }
 
 #[tauri::command]
+pub fn init_repository(path: String) -> Result<RepoSummary, String> {
+    let repo = Repository::init(&path).map_err(|e| e.to_string())?;
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Repository has no working directory (bare repo?)".to_string())?
+        .to_path_buf();
+    let name = workdir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| workdir.to_string_lossy().to_string());
+
+    Ok(RepoSummary {
+        path: workdir.to_string_lossy().to_string(),
+        name,
+    })
+}
+
+#[tauri::command]
+pub fn add_remote(repo_path: String, name: String, url: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
+    repo.remote(&name, &url).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_status(repo_path: String) -> Result<RepoStatus, String> {
     let repo = open_repo(&repo_path)?;
     let mut opts = StatusOptions::new();

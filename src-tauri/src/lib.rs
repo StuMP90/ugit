@@ -7,6 +7,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             git::open_repository,
+            git::init_repository,
+            git::add_remote,
             git::get_status,
             git::get_log,
             git::get_branches,
