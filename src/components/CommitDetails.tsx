@@ -7,13 +7,21 @@ interface Props {
   loading: boolean;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
+  onReset: (mode: "soft" | "mixed" | "hard") => void;
 }
 
 function formatDate(ts: number) {
   return new Date(ts * 1000).toLocaleString();
 }
 
-export default function CommitDetails({ commit, files, loading, selectedPath, onSelectPath }: Props) {
+export default function CommitDetails({
+  commit,
+  files,
+  loading,
+  selectedPath,
+  onSelectPath,
+  onReset,
+}: Props) {
   return (
     <div className="changes-panel">
       <div className="commit-details-header">
@@ -21,6 +29,18 @@ export default function CommitDetails({ commit, files, loading, selectedPath, on
         <div className="commit-details-meta">
           <span>{commit.author_name}</span> · <span>{formatDate(commit.timestamp)}</span> ·{" "}
           <span className="commit-hash">{commit.short_id}</span>
+        </div>
+        <div className="reset-actions">
+          <span className="reset-actions-label">Reset branch to here:</span>
+          <button className="toolbar-btn" onClick={() => onReset("soft")}>
+            Soft
+          </button>
+          <button className="toolbar-btn" onClick={() => onReset("mixed")}>
+            Mixed
+          </button>
+          <button className="danger-btn" onClick={() => onReset("hard")}>
+            Hard
+          </button>
         </div>
       </div>
       <div className="changes-lists">

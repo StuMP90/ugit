@@ -41,7 +41,9 @@ pub fn run() {
             git::rebase_continue,
             git::rebase_abort,
             git::read_working_file,
+            git::write_working_file,
             git::resolve_conflict,
+            git::reset_to_commit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

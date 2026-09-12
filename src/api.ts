@@ -89,4 +89,10 @@ export const api = {
 
   resolveConflict: (path: string, side: "ours" | "theirs") =>
     invoke<void>("resolve_conflict", { path, side }),
+
+  writeWorkingFile: (path: string, content: string) =>
+    invoke<void>("write_working_file", { path, content }),
+
+  resetToCommit: (commitId: string, mode: "soft" | "mixed" | "hard") =>
+    invoke<void>("reset_to_commit", { commitId, mode }),
 };

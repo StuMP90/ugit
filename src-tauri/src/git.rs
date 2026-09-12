@@ -1235,6 +1235,39 @@ pub fn read_working_file(path: String, state: tauri::State<AppState>) -> Result<
 }
 
 #[tauri::command]
+pub fn write_working_file(
+    path: String,
+    content: String,
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    let repo = open_repo(&state)?;
+    let full_path = repo.workdir().ok_or("No working directory")?.join(&path);
+    std::fs::write(&full_path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn reset_to_commit(
+    commit_id: String,
+    mode: String,
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    let repo = open_repo(&state)?;
+    let oid = git2::Oid::from_str(&commit_id).map_err(|e| e.to_string())?;
+    let object = repo.find_object(oid, None).map_err(|e| e.to_string())?;
+    let reset_type = match mode.as_str() {
+        "soft" => git2::ResetType::Soft,
+        "mixed" => git2::ResetType::Mixed,
+        "hard" => git2::ResetType::Hard,
+        other => return Err(format!("Unknown reset mode: {other}")),
+    };
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.force();
+    repo.reset(&object, reset_type, Some(&mut checkout))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn resolve_conflict(
     path: String,
     side: String,
@@ -1280,3 +1313,4 @@ pub fn resolve_conflict(
     index.write().map_err(|e| e.to_string())?;
     Ok(())
 }
+

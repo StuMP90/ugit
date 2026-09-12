@@ -158,10 +158,7 @@ export default function App() {
     }
   }
 
-  async function handleSelectConflict(path: string) {
-    setSelectedFile(null);
-    setWorkingDiff(null);
-    setConflictPath(path);
+  async function loadConflictContent(path: string) {
     setConflictLoading(true);
     try {
       const content = await api.readWorkingFile(path);
@@ -171,6 +168,13 @@ export default function App() {
     } finally {
       setConflictLoading(false);
     }
+  }
+
+  async function handleSelectConflict(path: string) {
+    setSelectedFile(null);
+    setWorkingDiff(null);
+    setConflictPath(path);
+    await loadConflictContent(path);
   }
 
   async function refreshWorkingSelection() {
@@ -445,6 +449,25 @@ export default function App() {
               loading={commitFilesLoading}
               selectedPath={selectedCommitPath}
               onSelectPath={setSelectedCommitPath}
+              onReset={(mode) => {
+                const messages: Record<string, string> = {
+                  soft: `Soft reset the current branch to "${selectedCommit.short_id}"? This moves the branch pointer here but keeps all changes staged.`,
+                  mixed: `Mixed reset the current branch to "${selectedCommit.short_id}"? This moves the branch pointer here and unstages changes, but keeps them in your working directory.`,
+                  hard: `Hard reset the current branch to "${selectedCommit.short_id}"? This discards ALL uncommitted changes and makes any commits after this point unreachable. This cannot be undone.`,
+                };
+                askConfirm(
+                  messages[mode],
+                  () =>
+                    runAction(async () => {
+                      await api.resetToCommit(selectedCommit.id, mode);
+                      await refreshAll();
+                      setSelection(null);
+                      setSelectedFile(null);
+                      setWorkingDiff(null);
+                    }),
+                  mode === "hard" ? "Hard reset" : "Reset"
+                );
+              }}
             />
           )}
 
@@ -475,14 +498,16 @@ export default function App() {
                   setConflictContent(null);
                 })
               }
-              onMarkResolved={() =>
+              onSave={(newContent) =>
                 runAction(async () => {
+                  await api.writeWorkingFile(conflictPath, newContent);
                   await api.stageFile(conflictPath);
                   await refreshWorkingSelection();
                   setConflictPath(null);
                   setConflictContent(null);
                 })
               }
+              onReload={() => runAction(() => loadConflictContent(conflictPath))}
             />
           )}
           {selection?.kind === "working" && !conflictPath && (
