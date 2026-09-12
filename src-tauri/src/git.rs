@@ -15,7 +15,9 @@ fn remote_callbacks<'a>() -> git2::RemoteCallbacks<'a> {
                 if let Ok(cred) = Cred::ssh_key_from_agent(user) {
                     return Ok(cred);
                 }
-                let home = std::env::var("HOME").unwrap_or_default();
+                let home = std::env::var("HOME")
+                    .or_else(|_| std::env::var("USERPROFILE"))
+                    .unwrap_or_default();
                 for key in ["id_ed25519", "id_rsa", "id_ecdsa"] {
                     let priv_path = PathBuf::from(&home).join(".ssh").join(key);
                     if priv_path.exists() {
