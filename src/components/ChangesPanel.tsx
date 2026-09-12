@@ -11,6 +11,8 @@ interface Props {
   status: RepoStatus;
   selectedFile: FileSelection | null;
   onSelectFile: (sel: FileSelection) => void;
+  selectedConflictPath: string | null;
+  onSelectConflict: (path: string) => void;
   onStage: (path: string) => void;
   onUnstage: (path: string) => void;
   onStageAll: () => void;
@@ -71,6 +73,8 @@ export default function ChangesPanel({
   status,
   selectedFile,
   onSelectFile,
+  selectedConflictPath,
+  onSelectConflict,
   onStage,
   onUnstage,
   onStageAll,
@@ -90,14 +94,16 @@ export default function ChangesPanel({
               <span>Conflicted ({status.conflicted.length})</span>
             </div>
             {status.conflicted.map((e) => (
-              <FileRow
+              <div
                 key={e.path}
-                entry={e}
-                staged={false}
-                selected={selectedFile?.path === e.path}
-                onSelect={() => onSelectFile({ path: e.path, staged: false })}
-                onToggle={() => onStage(e.path)}
-              />
+                className={"file-row" + (selectedConflictPath === e.path ? " selected" : "")}
+                onClick={() => onSelectConflict(e.path)}
+              >
+                <span className={"file-status-badge status-" + e.status}>
+                  {statusLetter(e.status)}
+                </span>
+                <span className="file-path">{e.path}</span>
+              </div>
             ))}
           </div>
         )}

@@ -83,3 +83,21 @@ export interface TagInfo {
 // A selectable row in the commit graph: either the special "working changes"
 // row, or a real commit identified by its id.
 export type Selection = { kind: "working" } | { kind: "commit"; id: string };
+
+export interface RepoState {
+  state: string; // "clean" | "merge" | "rebase" | "cherrypick" | "revert" | "other"
+  merge_summary: string | null;
+  conflict_count: number;
+}
+
+export interface MergeOutcome {
+  status: string; // "up_to_date" | "fast_forward" | "merged" | "conflicts"
+  conflict_count: number;
+}
+
+export interface RebaseProgress {
+  status: string; // "conflicts" | "complete"
+  current: number;
+  total: number;
+  current_summary: string;
+}

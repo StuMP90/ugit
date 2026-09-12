@@ -3,7 +3,10 @@ import type {
   BranchInfo,
   CommitInfo,
   FileDiff,
+  MergeOutcome,
+  RebaseProgress,
   RemoteInfo,
+  RepoState,
   RepoStatus,
   RepoSummary,
   StashInfo,
@@ -69,4 +72,21 @@ export const api = {
   stashApply: (index: number) => invoke<void>("stash_apply", { index }),
 
   stashDrop: (index: number) => invoke<void>("stash_drop", { index }),
+
+  getRepoState: () => invoke<RepoState>("get_repo_state"),
+
+  mergeBranch: (name: string) => invoke<MergeOutcome>("merge_branch", { name }),
+
+  mergeAbort: () => invoke<void>("merge_abort"),
+
+  startRebase: (onto: string) => invoke<RebaseProgress>("start_rebase", { onto }),
+
+  rebaseContinue: () => invoke<RebaseProgress>("rebase_continue"),
+
+  rebaseAbort: () => invoke<void>("rebase_abort"),
+
+  readWorkingFile: (path: string) => invoke<string>("read_working_file", { path }),
+
+  resolveConflict: (path: string, side: "ours" | "theirs") =>
+    invoke<void>("resolve_conflict", { path, side }),
 };

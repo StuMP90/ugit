@@ -4,6 +4,8 @@ import type {
   BranchInfo,
   CommitInfo,
   FileDiff,
+  RebaseProgress,
+  RepoState,
   RepoStatus,
   RepoSummary,
   Selection,
@@ -16,6 +18,8 @@ import CommitGraph from "./components/CommitGraph";
 import ChangesPanel, { FileSelection } from "./components/ChangesPanel";
 import CommitDetails from "./components/CommitDetails";
 import DiffView from "./components/DiffView";
+import ConflictView from "./components/ConflictView";
+import MergeRebaseBanner from "./components/MergeRebaseBanner";
 import RepoOpen from "./components/RepoOpen";
 import PromptModal from "./components/PromptModal";
 import "./App.css";
@@ -33,11 +37,17 @@ export default function App() {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [tags, setTags] = useState<TagInfo[]>([]);
   const [stashes, setStashes] = useState<StashInfo[]>([]);
+  const [repoState, setRepoState] = useState<RepoState | null>(null);
+  const [rebaseProgress, setRebaseProgress] = useState<RebaseProgress | null>(null);
 
   const [selection, setSelection] = useState<Selection | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileSelection | null>(null);
   const [workingDiff, setWorkingDiff] = useState<FileDiff | null>(null);
   const [workingDiffLoading, setWorkingDiffLoading] = useState(false);
+
+  const [conflictPath, setConflictPath] = useState<string | null>(null);
+  const [conflictContent, setConflictContent] = useState<string | null>(null);
+  const [conflictLoading, setConflictLoading] = useState(false);
 
   const [commitFiles, setCommitFiles] = useState<FileDiff[]>([]);
   const [commitFilesLoading, setCommitFilesLoading] = useState(false);
@@ -60,18 +70,20 @@ export default function App() {
   }, []);
 
   const refreshAll = useCallback(async () => {
-    const [s, l, b, t, st] = await Promise.all([
+    const [s, l, b, t, st, rs] = await Promise.all([
       api.getStatus(),
       api.getLog(500),
       api.getBranches(),
       api.getTags(),
       api.stashList(),
+      api.getRepoState(),
     ]);
     setStatus(s);
     setCommits(l);
     setBranches(b);
     setTags(t);
     setStashes(st);
+    setRepoState(rs);
   }, []);
 
   useEffect(() => {
@@ -89,6 +101,9 @@ export default function App() {
       setSelection(null);
       setSelectedFile(null);
       setWorkingDiff(null);
+      setConflictPath(null);
+      setConflictContent(null);
+      setRebaseProgress(null);
     } catch (e) {
       setOpenError(String(e));
     }
@@ -98,6 +113,8 @@ export default function App() {
     setSelection(sel);
     setSelectedFile(null);
     setWorkingDiff(null);
+    setConflictPath(null);
+    setConflictContent(null);
     setSelectedCommitPath(null);
     setCommitFiles([]);
     if (sel.kind === "commit") {
@@ -115,6 +132,8 @@ export default function App() {
   }
 
   async function handleSelectFile(sel: FileSelection) {
+    setConflictPath(null);
+    setConflictContent(null);
     setSelectedFile(sel);
     setWorkingDiffLoading(true);
     try {
@@ -127,9 +146,25 @@ export default function App() {
     }
   }
 
+  async function handleSelectConflict(path: string) {
+    setSelectedFile(null);
+    setWorkingDiff(null);
+    setConflictPath(path);
+    setConflictLoading(true);
+    try {
+      const content = await api.readWorkingFile(path);
+      setConflictContent(content);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setConflictLoading(false);
+    }
+  }
+
   async function refreshWorkingSelection() {
-    const s = await api.getStatus();
+    const [s, rs] = await Promise.all([api.getStatus(), api.getRepoState()]);
     setStatus(s);
+    setRepoState(rs);
     if (selectedFile) {
       const stillThere = (selectedFile.staged ? s.staged : s.unstaged).some(
         (f) => f.path === selectedFile.path
@@ -140,6 +175,13 @@ export default function App() {
       } else {
         setSelectedFile(null);
         setWorkingDiff(null);
+      }
+    }
+    if (conflictPath) {
+      const stillConflicted = s.conflicted.some((f) => f.path === conflictPath);
+      if (!stillConflicted) {
+        setConflictPath(null);
+        setConflictContent(null);
       }
     }
   }
@@ -186,6 +228,42 @@ export default function App() {
         }}
       />
 
+      {repoState && repoState.state !== "clean" && (
+        <MergeRebaseBanner
+          repoState={repoState}
+          rebaseProgress={rebaseProgress}
+          busy={busy}
+          onContinueRebase={() =>
+            runAction(async () => {
+              const progress = await api.rebaseContinue();
+              setRebaseProgress(progress);
+              await refreshAll();
+              if (progress.status === "conflicts") {
+                setSelection({ kind: "working" });
+              } else {
+                setInfo("Rebase complete");
+              }
+            })
+          }
+          onAbortRebase={() => {
+            if (!window.confirm("Abort the in-progress rebase and restore the branch to its previous state?"))
+              return;
+            runAction(async () => {
+              await api.rebaseAbort();
+              setRebaseProgress(null);
+              await refreshAll();
+            });
+          }}
+          onAbortMerge={() => {
+            if (!window.confirm("Abort the in-progress merge and discard merge changes?")) return;
+            runAction(async () => {
+              await api.mergeAbort();
+              await refreshAll();
+            });
+          }}
+        />
+      )}
+
       {error && (
         <div className="error-banner dismissible" onClick={() => setError(null)}>
           {error}
@@ -214,6 +292,40 @@ export default function App() {
             runAction(async () => {
               await api.deleteBranch(name, isRemote);
               await refreshAll();
+            });
+          }}
+          onMergeBranch={(name) =>
+            runAction(async () => {
+              const outcome = await api.mergeBranch(name);
+              await refreshAll();
+              if (outcome.status === "conflicts") {
+                setSelection({ kind: "working" });
+                setInfo(null);
+              } else if (outcome.status === "up_to_date") {
+                setInfo("Already up to date");
+              } else if (outcome.status === "fast_forward") {
+                setInfo(`Fast-forwarded to ${name}`);
+              } else {
+                setInfo(`Merged ${name}`);
+              }
+            })
+          }
+          onRebaseOnto={(name) => {
+            if (
+              !window.confirm(
+                `Rebase the current branch onto '${name}'? This rewrites commit history for the current branch.`
+              )
+            )
+              return;
+            runAction(async () => {
+              const progress = await api.startRebase(name);
+              setRebaseProgress(progress);
+              await refreshAll();
+              if (progress.status === "conflicts") {
+                setSelection({ kind: "working" });
+              } else {
+                setInfo("Rebase complete");
+              }
             });
           }}
           onStashApply={(i) =>
@@ -252,6 +364,8 @@ export default function App() {
               status={status}
               selectedFile={selectedFile}
               onSelectFile={handleSelectFile}
+              selectedConflictPath={conflictPath}
+              onSelectConflict={handleSelectConflict}
               committing={committing}
               onStage={(path) =>
                 runAction(async () => {
@@ -313,7 +427,38 @@ export default function App() {
         </div>
 
         <div className="diff-column">
-          {selection?.kind === "working" && (
+          {selection?.kind === "working" && conflictPath && (
+            <ConflictView
+              path={conflictPath}
+              content={conflictContent}
+              loading={conflictLoading}
+              onUseOurs={() =>
+                runAction(async () => {
+                  await api.resolveConflict(conflictPath, "ours");
+                  await refreshWorkingSelection();
+                  setConflictPath(null);
+                  setConflictContent(null);
+                })
+              }
+              onUseTheirs={() =>
+                runAction(async () => {
+                  await api.resolveConflict(conflictPath, "theirs");
+                  await refreshWorkingSelection();
+                  setConflictPath(null);
+                  setConflictContent(null);
+                })
+              }
+              onMarkResolved={() =>
+                runAction(async () => {
+                  await api.stageFile(conflictPath);
+                  await refreshWorkingSelection();
+                  setConflictPath(null);
+                  setConflictContent(null);
+                })
+              }
+            />
+          )}
+          {selection?.kind === "working" && !conflictPath && (
             <DiffView diff={workingDiff} loading={workingDiffLoading} />
           )}
           {selection?.kind === "commit" && (

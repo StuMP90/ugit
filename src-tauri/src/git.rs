@@ -664,18 +664,47 @@ pub fn discard_file_changes(path: String, state: tauri::State<AppState>) -> Resu
 
 #[tauri::command]
 pub fn commit(message: String, state: tauri::State<AppState>) -> Result<CommitInfo, String> {
-    let repo = open_repo(&state)?;
+    let mut repo = open_repo(&state)?;
     let mut index = repo.index().map_err(|e| e.to_string())?;
+    if index.has_conflicts() {
+        return Err("Cannot commit: unresolved conflicts remain".to_string());
+    }
+
+    let mut parent_oids: Vec<git2::Oid> = Vec::new();
+    if let Ok(head) = repo.head() {
+        if let Ok(c) = head.peel_to_commit() {
+            parent_oids.push(c.id());
+        }
+    }
+
+    // Finishing a `git merge` that paused for conflicts needs the merge
+    // head(s) as extra parents, same as a normal `git commit` would do.
+    let is_merging = repo.state() == git2::RepositoryState::Merge;
+    if is_merging {
+        let mut merge_oids = Vec::new();
+        let _ = repo.mergehead_foreach(|oid| {
+            merge_oids.push(*oid);
+            true
+        });
+        parent_oids.extend(merge_oids);
+    }
+
     let tree_oid = index.write_tree().map_err(|e| e.to_string())?;
     let tree = repo.find_tree(tree_oid).map_err(|e| e.to_string())?;
     let sig = repo.signature().map_err(|e| e.to_string())?;
-
-    let parent_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
-    let parents: Vec<&git2::Commit> = parent_commit.iter().collect();
+    let parents: Vec<git2::Commit> = parent_oids
+        .iter()
+        .filter_map(|oid| repo.find_commit(*oid).ok())
+        .collect();
+    let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
 
     let oid = repo
-        .commit(Some("HEAD"), &sig, &sig, &message, &tree, &parents)
+        .commit(Some("HEAD"), &sig, &sig, &message, &tree, &parent_refs)
         .map_err(|e| e.to_string())?;
+
+    if is_merging {
+        repo.cleanup_state().map_err(|e| e.to_string())?;
+    }
 
     let new_commit = repo.find_commit(oid).map_err(|e| e.to_string())?;
     let id = oid.to_string();
@@ -928,5 +957,326 @@ pub fn stash_drop(index: usize, state: tauri::State<AppState>) -> Result<(), Str
         .ok_or("No repository open")?;
     let mut repo = Repository::open(repo_path).map_err(|e| e.to_string())?;
     repo.stash_drop(index).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+// ---------- Merge / Rebase / Conflicts ----------
+
+#[derive(Serialize, Clone)]
+pub struct RepoState {
+    pub state: String,
+    pub merge_summary: Option<String>,
+    pub conflict_count: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub struct MergeOutcome {
+    pub status: String,
+    pub conflict_count: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub struct RebaseProgress {
+    pub status: String,
+    pub current: usize,
+    pub total: usize,
+    pub current_summary: String,
+}
+
+fn conflict_count(repo: &Repository) -> usize {
+    match repo.index() {
+        Ok(index) => index.conflicts().map(|c| c.count()).unwrap_or(0),
+        Err(_) => 0,
+    }
+}
+
+fn ref_name_for_oid(repo: &Repository, oid: git2::Oid) -> Option<String> {
+    repo.references().ok().and_then(|refs| {
+        refs.flatten()
+            .find(|r| r.target() == Some(oid) && (r.is_branch() || r.is_remote()))
+            .and_then(|r| r.shorthand().map(|s| s.to_string()))
+    })
+}
+
+#[tauri::command]
+pub fn get_repo_state(state: tauri::State<AppState>) -> Result<RepoState, String> {
+    let mut repo = open_repo(&state)?;
+
+    let state_str = match repo.state() {
+        git2::RepositoryState::Clean => "clean",
+        git2::RepositoryState::Merge => "merge",
+        git2::RepositoryState::Rebase
+        | git2::RepositoryState::RebaseInteractive
+        | git2::RepositoryState::RebaseMerge => "rebase",
+        git2::RepositoryState::CherryPick | git2::RepositoryState::CherryPickSequence => {
+            "cherrypick"
+        }
+        git2::RepositoryState::Revert | git2::RepositoryState::RevertSequence => "revert",
+        _ => "other",
+    };
+
+    let merge_summary = if state_str == "merge" {
+        let mut oids = Vec::new();
+        let _ = repo.mergehead_foreach(|oid| {
+            oids.push(*oid);
+            true
+        });
+        oids.first().and_then(|oid| {
+            repo.find_commit(*oid).ok().map(|c| {
+                let name = ref_name_for_oid(&repo, *oid)
+                    .unwrap_or_else(|| oid.to_string()[..7.min(oid.to_string().len())].to_string());
+                format!("{} ({})", name, c.summary().unwrap_or(""))
+            })
+        })
+    } else {
+        None
+    };
+
+    Ok(RepoState {
+        state: state_str.to_string(),
+        merge_summary,
+        conflict_count: conflict_count(&repo),
+    })
+}
+
+#[tauri::command]
+pub fn merge_branch(name: String, state: tauri::State<AppState>) -> Result<MergeOutcome, String> {
+    let repo = open_repo(&state)?;
+    let (obj, _) = repo.revparse_ext(&name).map_err(|e| e.to_string())?;
+    let their_commit = obj.peel_to_commit().map_err(|e| e.to_string())?;
+    let their_annotated = repo
+        .find_annotated_commit(their_commit.id())
+        .map_err(|e| e.to_string())?;
+
+    let analysis = repo
+        .merge_analysis(&[&their_annotated])
+        .map_err(|e| e.to_string())?;
+
+    if analysis.0.is_up_to_date() {
+        return Ok(MergeOutcome {
+            status: "up_to_date".to_string(),
+            conflict_count: 0,
+        });
+    }
+
+    if analysis.0.is_fast_forward() {
+        let head_ref_name = repo
+            .head()
+            .map_err(|e| e.to_string())?
+            .name()
+            .ok_or("invalid head ref")?
+            .to_string();
+        let mut reference = repo
+            .find_reference(&head_ref_name)
+            .map_err(|e| e.to_string())?;
+        reference
+            .set_target(their_commit.id(), "Fast-forward merge")
+            .map_err(|e| e.to_string())?;
+        repo.set_head(&head_ref_name).map_err(|e| e.to_string())?;
+        repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
+            .map_err(|e| e.to_string())?;
+        return Ok(MergeOutcome {
+            status: "fast_forward".to_string(),
+            conflict_count: 0,
+        });
+    }
+
+    repo.merge(&[&their_annotated], None, None)
+        .map_err(|e| e.to_string())?;
+
+    if conflict_count(&repo) > 0 {
+        return Ok(MergeOutcome {
+            status: "conflicts".to_string(),
+            conflict_count: conflict_count(&repo),
+        });
+    }
+
+    let mut index = repo.index().map_err(|e| e.to_string())?;
+    let tree_oid = index.write_tree().map_err(|e| e.to_string())?;
+    let tree = repo.find_tree(tree_oid).map_err(|e| e.to_string())?;
+    let sig = repo.signature().map_err(|e| e.to_string())?;
+    let head_commit = repo
+        .head()
+        .map_err(|e| e.to_string())?
+        .peel_to_commit()
+        .map_err(|e| e.to_string())?;
+    let current_branch = repo
+        .head()
+        .ok()
+        .and_then(|h| h.shorthand().map(|s| s.to_string()))
+        .unwrap_or_default();
+    let message = format!("Merge {} into {}", name, current_branch);
+    repo.commit(
+        Some("HEAD"),
+        &sig,
+        &sig,
+        &message,
+        &tree,
+        &[&head_commit, &their_commit],
+    )
+    .map_err(|e| e.to_string())?;
+    repo.cleanup_state().map_err(|e| e.to_string())?;
+
+    Ok(MergeOutcome {
+        status: "merged".to_string(),
+        conflict_count: 0,
+    })
+}
+
+#[tauri::command]
+pub fn merge_abort(state: tauri::State<AppState>) -> Result<(), String> {
+    let repo = open_repo(&state)?;
+    let head_commit = repo
+        .head()
+        .map_err(|e| e.to_string())?
+        .peel_to_commit()
+        .map_err(|e| e.to_string())?;
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.force();
+    repo.reset(
+        head_commit.as_object(),
+        git2::ResetType::Hard,
+        Some(&mut checkout),
+    )
+    .map_err(|e| e.to_string())?;
+    repo.cleanup_state().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn drive_rebase(repo: &Repository, rebase: &mut git2::Rebase) -> Result<RebaseProgress, String> {
+    let sig = repo.signature().map_err(|e| e.to_string())?;
+    let total = rebase.len();
+
+    while let Some(op_result) = rebase.next() {
+        let op = op_result.map_err(|e| e.to_string())?;
+        let op_id = op.id();
+
+        if conflict_count(repo) > 0 {
+            let current = rebase.operation_current().unwrap_or(0) + 1;
+            let summary = repo
+                .find_commit(op_id)
+                .ok()
+                .and_then(|c| c.summary().map(|s| s.to_string()))
+                .unwrap_or_default();
+            return Ok(RebaseProgress {
+                status: "conflicts".to_string(),
+                current,
+                total,
+                current_summary: summary,
+            });
+        }
+
+        rebase.commit(None, &sig, None).map_err(|e| e.to_string())?;
+    }
+
+    rebase.finish(Some(&sig)).map_err(|e| e.to_string())?;
+    Ok(RebaseProgress {
+        status: "complete".to_string(),
+        current: total,
+        total,
+        current_summary: String::new(),
+    })
+}
+
+#[tauri::command]
+pub fn start_rebase(onto: String, state: tauri::State<AppState>) -> Result<RebaseProgress, String> {
+    let repo = open_repo(&state)?;
+    let head_ref = repo.head().map_err(|e| e.to_string())?;
+    let branch_annotated = repo
+        .reference_to_annotated_commit(&head_ref)
+        .map_err(|e| e.to_string())?;
+
+    let (onto_obj, _) = repo.revparse_ext(&onto).map_err(|e| e.to_string())?;
+    let onto_annotated = repo
+        .find_annotated_commit(onto_obj.id())
+        .map_err(|e| e.to_string())?;
+
+    let mut rebase = repo
+        .rebase(Some(&branch_annotated), None, Some(&onto_annotated), None)
+        .map_err(|e| e.to_string())?;
+
+    drive_rebase(&repo, &mut rebase)
+}
+
+#[tauri::command]
+pub fn rebase_continue(state: tauri::State<AppState>) -> Result<RebaseProgress, String> {
+    let repo = open_repo(&state)?;
+    if conflict_count(&repo) > 0 {
+        return Err("Resolve all conflicts before continuing the rebase".to_string());
+    }
+
+    let mut rebase = repo.open_rebase(None).map_err(|e| e.to_string())?;
+    let sig = repo.signature().map_err(|e| e.to_string())?;
+
+    // The operation that paused on conflicts was already applied to the
+    // index/workdir; now that it's resolved, commit it before advancing.
+    if rebase.operation_current().is_some() {
+        rebase
+            .commit(None, &sig, None)
+            .map_err(|e| e.to_string())?;
+    }
+
+    drive_rebase(&repo, &mut rebase)
+}
+
+#[tauri::command]
+pub fn rebase_abort(state: tauri::State<AppState>) -> Result<(), String> {
+    let repo = open_repo(&state)?;
+    let mut rebase = repo.open_rebase(None).map_err(|e| e.to_string())?;
+    rebase.abort().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn read_working_file(path: String, state: tauri::State<AppState>) -> Result<String, String> {
+    let repo = open_repo(&state)?;
+    let full_path = repo.workdir().ok_or("No working directory")?.join(&path);
+    std::fs::read_to_string(&full_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn resolve_conflict(
+    path: String,
+    side: String,
+    state: tauri::State<AppState>,
+) -> Result<(), String> {
+    let repo = open_repo(&state)?;
+    let mut index = repo.index().map_err(|e| e.to_string())?;
+    let full_path = repo.workdir().ok_or("No working directory")?.join(&path);
+
+    let mut resolved_entry: Option<git2::IndexEntry> = None;
+    for conflict in index.conflicts().map_err(|e| e.to_string())?.flatten() {
+        let matches_path = |entry: &Option<git2::IndexEntry>| {
+            entry
+                .as_ref()
+                .map(|e| String::from_utf8_lossy(&e.path) == path)
+                .unwrap_or(false)
+        };
+        if matches_path(&conflict.our) || matches_path(&conflict.their) || matches_path(&conflict.ancestor) {
+            resolved_entry = if side == "ours" {
+                conflict.our
+            } else {
+                conflict.their
+            };
+            break;
+        }
+    }
+
+    match resolved_entry {
+        Some(entry) => {
+            let blob = repo.find_blob(entry.id).map_err(|e| e.to_string())?;
+            std::fs::write(&full_path, blob.content()).map_err(|e| e.to_string())?;
+            index
+                .add_path(std::path::Path::new(&path))
+                .map_err(|e| e.to_string())?;
+        }
+        None => {
+            let _ = std::fs::remove_file(&full_path);
+            index
+                .remove_path(std::path::Path::new(&path))
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    index.write().map_err(|e| e.to_string())?;
     Ok(())
 }

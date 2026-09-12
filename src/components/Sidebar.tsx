@@ -8,6 +8,8 @@ interface Props {
   onCheckout: (name: string) => void;
   onCreateBranch: () => void;
   onDeleteBranch: (name: string, isRemote: boolean) => void;
+  onMergeBranch: (name: string) => void;
+  onRebaseOnto: (name: string) => void;
   onStashApply: (index: number) => void;
   onStashPop: (index: number) => void;
   onStashDrop: (index: number) => void;
@@ -46,6 +48,8 @@ export default function Sidebar({
   onCheckout,
   onCreateBranch,
   onDeleteBranch,
+  onMergeBranch,
+  onRebaseOnto,
   onStashApply,
   onStashPop,
   onStashDrop,
@@ -86,16 +90,38 @@ export default function Sidebar({
               </span>
             )}
             {!b.is_head && (
-              <button
-                className="icon-btn"
-                title="Delete branch"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteBranch(b.name, false);
-                }}
-              >
-                ✕
-              </button>
+              <>
+                <button
+                  className="icon-btn"
+                  title={`Merge '${b.name}' into current branch`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMergeBranch(b.name);
+                  }}
+                >
+                  ⇄
+                </button>
+                <button
+                  className="icon-btn"
+                  title={`Rebase current branch onto '${b.name}'`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRebaseOnto(b.name);
+                  }}
+                >
+                  ⤴
+                </button>
+                <button
+                  className="icon-btn"
+                  title="Delete branch"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteBranch(b.name, false);
+                  }}
+                >
+                  ✕
+                </button>
+              </>
             )}
           </div>
         ))}
@@ -105,6 +131,26 @@ export default function Sidebar({
         {remote.map((b) => (
           <div key={b.full_name} className="sidebar-item" onClick={() => onCheckout(b.name)}>
             <span className="sidebar-item-label">{b.name}</span>
+            <button
+              className="icon-btn"
+              title={`Merge '${b.name}' into current branch`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMergeBranch(b.name);
+              }}
+            >
+              ⇄
+            </button>
+            <button
+              className="icon-btn"
+              title={`Rebase current branch onto '${b.name}'`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRebaseOnto(b.name);
+              }}
+            >
+              ⤴
+            </button>
           </div>
         ))}
       </Section>

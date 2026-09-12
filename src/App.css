@@ -502,6 +502,59 @@ button {
   white-space: pre;
 }
 
+/* ---------- Merge / rebase banner ---------- */
+
+.merge-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  font-size: 12px;
+  background: #3a3320;
+  color: #e0c34e;
+  border-bottom: 1px solid #5c4f26;
+  flex-shrink: 0;
+}
+.merge-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---------- Conflict view ---------- */
+
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.conflict-hint {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: inherit;
+}
+.diff-line.conflict-marker {
+  color: #e0c34e;
+  background: var(--bg-1);
+  font-weight: 600;
+}
+.diff-line.conflict-ours {
+  background: #1a2e20;
+}
+.diff-line.conflict-ours .diff-content {
+  color: #b7f0c2;
+}
+.diff-line.conflict-theirs {
+  background: #33191d;
+}
+.diff-line.conflict-theirs .diff-content {
+  color: #f3b3bd;
+}
+
 /* ---------- Modal ---------- */
 
 .modal-backdrop {

@@ -34,6 +34,14 @@ pub fn run() {
             git::stash_pop,
             git::stash_apply,
             git::stash_drop,
+            git::get_repo_state,
+            git::merge_branch,
+            git::merge_abort,
+            git::start_rebase,
+            git::rebase_continue,
+            git::rebase_abort,
+            git::read_working_file,
+            git::resolve_conflict,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
