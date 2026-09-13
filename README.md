@@ -1,6 +1,36 @@
 # uGit
 
-An interactive, GitKraken-style desktop git client built with Tauri (Rust + `git2`) and React.
+An interactive, GitKraken-style desktop git client for Linux and Windows, built with Tauri
+(Rust + `git2`) and React. It's aimed at everyday git workflows — browsing history, staging and
+committing, branching, merging, and resolving conflicts — without leaving a GUI.
+
+## Features
+
+- **Multiple repositories at once** — each open repo gets its own tab; switching tabs is instant
+  and never loses in-progress work (a draft commit message, a half-resolved merge, etc).
+- **Commit graph** — a colored, lane-based visualization of history across all branches, in the
+  style of `git log --graph`. Click any commit to see its changed files and diffs.
+- **Commit search** — search by message, author, or branch/tag ref; shows a live match count with
+  Next/Prev navigation (and highlights every match while you scroll).
+- **Staging & commits** — stage/unstage individual files or everything at once, discard working
+  changes, view line-by-line diffs, and commit.
+- **Branching** — create, check out, and delete local and remote branches, with ahead/behind
+  indicators against upstream. Clicking a branch jumps straight to its latest commit.
+- **Merging & rebasing** — real merge and rebase support with conflict detection, plus a genuine
+  in-app 3-way merge tool: Local and Remote reference panes on top, an editable Result pane below.
+  Resolved conflicts stay clearly marked and stay editable (pick both sides and hand-tune the
+  result), and long unchanged stretches of a file collapse out of the way automatically.
+- **Branch reset** — soft/mixed/hard reset the current branch to any earlier commit.
+- **Stashing** — save, apply, pop, and drop stashes.
+- **Remotes** — add remotes, and fetch/pull/push with SSH-agent, `~/.ssh` key, and git
+  credential-helper authentication, tried in that order.
+- **Session memory** — reopens the same tabs (and the same active tab) you had open last time,
+  remembers the last folder you browsed to in the Open/New Repository dialog, and restores the
+  window's size and position.
+- **Built-in help** — a Help panel covering things a GUI client would otherwise leave you to figure
+  out yourself: setting up SSH, creating a new local repo, linking a local repo to an existing
+  remote, and creating a new remote from a local one — the last two are also real buttons, not just
+  instructions.
 
 ## Development
 
@@ -104,6 +134,13 @@ toolchain's linker/ar — update the path there if you extract it somewhere othe
 `~/toolchains/llvm-mingw-*-ucrt-ubuntu-22.04-x86_64/`. This config only applies to that one
 target triple; it has no effect on the normal Linux build.
 
+First, build the frontend (this path calls `cargo` directly rather than going through
+`npm run tauri build`, so nothing runs it for you):
+
+```bash
+npm run build
+```
+
 Then build:
 
 ```bash
@@ -114,6 +151,18 @@ PATH="$TC/bin:$PATH" cargo build --release --target x86_64-pc-windows-gnullvm --
 
 Output: `src-tauri/target/x86_64-pc-windows-gnullvm/release/ugit.exe` — a standalone,
 self-contained executable (no installer is produced by this path; see below).
+
+**Gotcha:** if you only changed frontend files (nothing under `src-tauri/src/`) since the last
+Windows build, plain `cargo build` won't notice `dist/` changed and will silently skip rebuilding
+— you'll get a stale `.exe` with the old UI baked in, with no warning. Force it to pick up the new
+frontend with:
+
+```bash
+cargo clean -p ugit --release --target x86_64-pc-windows-gnullvm
+```
+
+before rebuilding. (The regular Linux path, `npm run tauri build`, does not have this problem — it
+always runs the frontend build itself before compiling.)
 
 Note: the library crate's `crate-type` in `src-tauri/Cargo.toml` was trimmed to
 `["staticlib", "rlib"]` (dropping `"cdylib"`) to make this possible — `cdylib` is only needed for
@@ -134,3 +183,10 @@ with Windows-native tooling (WiX or NSIS) — not attempted yet from this Linux 
 
 The produced `.exe` has not been run on an actual Windows machine — cross-compiling only verifies
 it builds and links correctly, not that it behaves correctly at runtime.
+
+## License
+
+[GNU AGPLv3](LICENSE), with the [Commons Clause](https://commonsclause.com/) condition. In short:
+the source is open, you're free to use, modify, and redistribute it, and any distributed
+modifications must stay open under the same terms — but nobody may sell it or offer it as a paid
+service without separate permission.

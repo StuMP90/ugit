@@ -34,9 +34,10 @@ interface Props {
   status: RepoStatus | null;
   selection: Selection | null;
   onSelect: (s: Selection) => void;
+  matchIds?: Set<string>;
 }
 
-export default function CommitGraph({ commits, status, selection, onSelect }: Props) {
+export default function CommitGraph({ commits, status, selection, onSelect, matchIds }: Props) {
   const hasChanges =
     !!status &&
     (status.staged.length > 0 || status.unstaged.length > 0 || status.conflicted.length > 0);
@@ -133,9 +134,11 @@ export default function CommitGraph({ commits, status, selection, onSelect }: Pr
         {commits.map((c) => (
           <div
             key={c.id}
+            id={`commit-row-${c.id}`}
             className={
               "commit-row" +
-              (selection?.kind === "commit" && selection.id === c.id ? " selected" : "")
+              (selection?.kind === "commit" && selection.id === c.id ? " selected" : "") +
+              (matchIds?.has(c.id) ? " search-match" : "")
             }
             style={{ height: ROW_HEIGHT, paddingLeft: graphWidth }}
             onClick={() => onSelect({ kind: "commit", id: c.id })}

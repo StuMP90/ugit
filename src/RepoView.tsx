@@ -68,6 +68,9 @@ export default function RepoView({ repoPath }: Props) {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [addRemoteOpen, setAddRemoteOpen] = useState(false);
 
+  const [commitSearch, setCommitSearch] = useState("");
+  const [matchIndex, setMatchIndex] = useState(0);
+
   function askConfirm(message: string, onConfirm: () => void, confirmLabel?: string) {
     setConfirmState({ message, onConfirm, confirmLabel });
   }
@@ -203,10 +206,51 @@ export default function RepoView({ repoPath }: Props) {
 
   const selectedCommit =
     selection?.kind === "commit" ? commits.find((c) => c.id === selection.id) ?? null : null;
+  const isHeadCommit =
+    !!selectedCommit && branches.some((b) => b.is_head && b.target === selectedCommit.id);
   const selectedCommitFileDiff =
     selectedCommit && selectedCommitPath
       ? commitFiles.find((f) => f.path === selectedCommitPath) ?? null
       : null;
+
+  const searchQuery = commitSearch.trim().toLowerCase();
+  const searchMatches = searchQuery
+    ? commits.filter(
+        (c) =>
+          c.summary.toLowerCase().includes(searchQuery) ||
+          c.message.toLowerCase().includes(searchQuery) ||
+          c.author_name.toLowerCase().includes(searchQuery) ||
+          c.refs.some((r) => r.toLowerCase().includes(searchQuery))
+      )
+    : [];
+  const matchIds = new Set(searchMatches.map((c) => c.id));
+  const currentMatchIndex = searchMatches.length > 0 ? matchIndex % searchMatches.length : -1;
+
+  async function selectCommitAndScroll(id: string) {
+    await handleSelect({ kind: "commit", id });
+    requestAnimationFrame(() => {
+      document.getElementById(`commit-row-${id}`)?.scrollIntoView({ block: "center" });
+    });
+  }
+
+  function jumpToMatch(index: number) {
+    if (searchMatches.length === 0) return;
+    const wrapped = ((index % searchMatches.length) + searchMatches.length) % searchMatches.length;
+    setMatchIndex(wrapped);
+    selectCommitAndScroll(searchMatches[wrapped].id);
+  }
+
+  function handleSearchChange(value: string) {
+    setCommitSearch(value);
+    setMatchIndex(0);
+  }
+
+  useEffect(() => {
+    if (searchQuery && searchMatches.length > 0) {
+      jumpToMatch(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   return (
     <div className="app">
@@ -262,6 +306,10 @@ export default function RepoView({ repoPath }: Props) {
                 runAction(async () => {
                   await api.rebaseAbort(repoPath);
                   setRebaseProgress(null);
+                  setConflictPath(null);
+                  setConflictContent(null);
+                  setSelectedFile(null);
+                  setWorkingDiff(null);
                   await refreshAll();
                 }),
               "Abort rebase"
@@ -273,6 +321,10 @@ export default function RepoView({ repoPath }: Props) {
               () =>
                 runAction(async () => {
                   await api.mergeAbort(repoPath);
+                  setConflictPath(null);
+                  setConflictContent(null);
+                  setSelectedFile(null);
+                  setWorkingDiff(null);
                   await refreshAll();
                 }),
               "Abort merge"
@@ -301,8 +353,16 @@ export default function RepoView({ repoPath }: Props) {
           onAddRemote={() => setAddRemoteOpen(true)}
           onCheckout={(name) =>
             runAction(async () => {
+              const already = branches.find((b) => b.is_head && b.name === name);
+              if (already) {
+                if (already.target) await selectCommitAndScroll(already.target);
+                return;
+              }
               await api.checkoutBranch(repoPath, name);
               await refreshAll();
+              const fresh = await api.getBranches(repoPath);
+              const head = fresh.find((b) => b.is_head);
+              if (head?.target) await selectCommitAndScroll(head.target);
             })
           }
           onCreateBranch={() => setModal("branch")}
@@ -373,12 +433,54 @@ export default function RepoView({ repoPath }: Props) {
         />
 
         <div className="graph-column">
-          <CommitGraph
-            commits={commits}
-            status={status}
-            selection={selection}
-            onSelect={handleSelect}
-          />
+          <div className="graph-search-bar">
+            <input
+              className="graph-search-input"
+              placeholder="Search commits (message, author, ref)…"
+              value={commitSearch}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  jumpToMatch(currentMatchIndex + (e.shiftKey ? -1 : 1));
+                }
+              }}
+            />
+            {searchQuery && (
+              <>
+                <span className="graph-search-count">
+                  {searchMatches.length > 0
+                    ? `${currentMatchIndex + 1} of ${searchMatches.length}`
+                    : "No matches"}
+                </span>
+                <div className="graph-search-nav">
+                  <button
+                    className="toolbar-btn"
+                    disabled={searchMatches.length === 0}
+                    onClick={() => jumpToMatch(currentMatchIndex - 1)}
+                  >
+                    ◂ Prev
+                  </button>
+                  <button
+                    className="toolbar-btn"
+                    disabled={searchMatches.length === 0}
+                    onClick={() => jumpToMatch(currentMatchIndex + 1)}
+                  >
+                    Next ▸
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="graph-scroll-wrapper">
+            <CommitGraph
+              commits={commits}
+              status={status}
+              selection={selection}
+              onSelect={handleSelect}
+              matchIds={matchIds}
+            />
+          </div>
         </div>
 
         <div className="detail-column">
@@ -445,6 +547,7 @@ export default function RepoView({ repoPath }: Props) {
               loading={commitFilesLoading}
               selectedPath={selectedCommitPath}
               onSelectPath={setSelectedCommitPath}
+              isHead={isHeadCommit}
               onReset={(mode) => {
                 const messages: Record<string, string> = {
                   soft: `Soft reset the current branch to "${selectedCommit.short_id}"? This moves the branch pointer here but keeps all changes staged.`,

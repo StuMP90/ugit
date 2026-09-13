@@ -83,7 +83,7 @@ export default function Sidebar({
           <div
             key={b.full_name}
             className={"sidebar-item" + (b.is_head ? " active" : "")}
-            onClick={() => !b.is_head && onCheckout(b.name)}
+            onClick={() => onCheckout(b.name)}
             title={b.upstream ? `tracking ${b.upstream}` : undefined}
           >
             <span className="sidebar-item-label">{b.name}</span>

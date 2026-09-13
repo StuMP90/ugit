@@ -1,38 +1,71 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-interface ConflictBlock {
-  type: "context" | "conflict";
+const COLLAPSE_THRESHOLD = 12;
+
+function ContextBlock({
+  text,
+  editable,
+  onChange,
+}: {
   text: string;
-  oursLabel?: string;
-  theirsLabel?: string;
-  ours?: string;
-  theirs?: string;
-  startLine: number;
-  endLine: number;
+  editable?: boolean;
+  onChange?: (value: string) => void;
+}) {
+  const lineCount = text.split("\n").length;
+  const collapsible = lineCount > COLLAPSE_THRESHOLD;
+  const [expanded, setExpanded] = useState(!collapsible);
+
+  return (
+    <div className="conflict-context-wrap">
+      {collapsible && (
+        <button className="conflict-context-toggle" onClick={() => setExpanded((e) => !e)}>
+          {expanded ? "▾" : "▸"} {lineCount} unchanged lines
+        </button>
+      )}
+      {expanded &&
+        (editable ? (
+          <textarea
+            className="conflict-context-editable"
+            value={text}
+            rows={lineCount}
+            spellCheck={false}
+            onChange={(e) => onChange?.(e.target.value)}
+          />
+        ) : (
+          <pre className="conflict-context">{text}</pre>
+        ))}
+    </div>
+  );
 }
 
-function parseConflicts(content: string): ConflictBlock[] {
+interface ContextSegment {
+  type: "context";
+  text: string;
+}
+interface ConflictSegment {
+  type: "conflict";
+  ours: string;
+  theirs: string;
+  resolvedText: string;
+  decided: boolean;
+}
+type Segment = ContextSegment | ConflictSegment;
+
+function parseIntoSegments(content: string): Segment[] {
   const lines = content.split("\n");
-  const blocks: ConflictBlock[] = [];
+  const segments: Segment[] = [];
   let i = 0;
   let contextStart = 0;
 
   const flushContext = (end: number) => {
     if (end > contextStart) {
-      blocks.push({
-        type: "context",
-        text: lines.slice(contextStart, end).join("\n"),
-        startLine: contextStart,
-        endLine: end,
-      });
+      segments.push({ type: "context", text: lines.slice(contextStart, end).join("\n") });
     }
   };
 
   while (i < lines.length) {
     if (lines[i].startsWith("<<<<<<<")) {
       flushContext(i);
-      const startLine = i;
-      const oursLabel = lines[i];
       i++;
       const oursLines: string[] = [];
       while (i < lines.length && !lines[i].startsWith("=======")) {
@@ -45,17 +78,13 @@ function parseConflicts(content: string): ConflictBlock[] {
         theirsLines.push(lines[i]);
         i++;
       }
-      const theirsLabel = lines[i] ?? ">>>>>>>";
-      i++;
-      blocks.push({
+      i++; // skip >>>>>>> label
+      segments.push({
         type: "conflict",
-        text: "",
-        oursLabel,
-        theirsLabel,
         ours: oursLines.join("\n"),
         theirs: theirsLines.join("\n"),
-        startLine,
-        endLine: i,
+        resolvedText: "",
+        decided: false,
       });
       contextStart = i;
     } else {
@@ -63,7 +92,11 @@ function parseConflicts(content: string): ConflictBlock[] {
     }
   }
   flushContext(lines.length);
-  return blocks;
+  return segments;
+}
+
+function joinSegments(segments: Segment[]): string {
+  return segments.map((s) => (s.type === "context" ? s.text : s.resolvedText)).join("\n");
 }
 
 interface Props {
@@ -85,31 +118,53 @@ export default function ConflictView({
   onSave,
   onReload,
 }: Props) {
-  const [draft, setDraft] = useState(content ?? "");
+  const [segments, setSegments] = useState<Segment[]>(() => parseIntoSegments(content ?? ""));
   const [rawMode, setRawMode] = useState(false);
+  const [rawText, setRawText] = useState("");
 
   useEffect(() => {
-    setDraft(content ?? "");
+    setSegments(parseIntoSegments(content ?? ""));
+    setRawMode(false);
   }, [content]);
 
-  const blocks = useMemo(() => parseConflicts(draft), [draft]);
-  const remaining = blocks.filter((b) => b.type === "conflict").length;
+  const remaining = segments.filter((s) => s.type === "conflict" && !s.decided).length;
 
-  function acceptHunk(block: ConflictBlock, side: "ours" | "theirs" | "both") {
-    const lines = draft.split("\n");
-    const resolved =
-      side === "ours"
-        ? block.ours ?? ""
-        : side === "theirs"
-        ? block.theirs ?? ""
-        : `${block.ours ?? ""}\n${block.theirs ?? ""}`;
-    const resolvedLines = resolved.split("\n");
-    const newLines = [
-      ...lines.slice(0, block.startLine),
-      ...resolvedLines,
-      ...lines.slice(block.endLine),
-    ];
-    setDraft(newLines.join("\n"));
+  function updateContext(index: number, text: string) {
+    setSegments((prev) =>
+      prev.map((s, i) => (i === index && s.type === "context" ? { ...s, text } : s))
+    );
+  }
+
+  function updateConflictText(index: number, text: string) {
+    setSegments((prev) =>
+      prev.map((s, i) =>
+        i === index && s.type === "conflict" ? { ...s, resolvedText: text, decided: true } : s
+      )
+    );
+  }
+
+  function pickSide(index: number, side: "ours" | "theirs" | "both") {
+    setSegments((prev) =>
+      prev.map((s, i) => {
+        if (i !== index || s.type !== "conflict") return s;
+        const resolved = side === "ours" ? s.ours : side === "theirs" ? s.theirs : `${s.ours}\n${s.theirs}`;
+        return { ...s, resolvedText: resolved, decided: true };
+      })
+    );
+  }
+
+  function toggleRawMode() {
+    if (rawMode) {
+      setSegments(parseIntoSegments(rawText));
+      setRawMode(false);
+    } else {
+      setRawText(joinSegments(segments));
+      setRawMode(true);
+    }
+  }
+
+  function handleSave() {
+    onSave(rawMode ? rawText : joinSegments(segments));
   }
 
   if (loading || content === null) {
@@ -135,10 +190,10 @@ export default function ConflictView({
           Reload from disk
         </button>
         <span className="conflict-actions-spacer" />
-        <button className="toolbar-btn" onClick={() => setRawMode((r) => !r)}>
-          {rawMode ? "Structured view" : "Raw editor"}
+        <button className="toolbar-btn" onClick={toggleRawMode}>
+          {rawMode ? "3-way view" : "Raw editor"}
         </button>
-        <button className="primary-btn" onClick={() => onSave(draft)}>
+        <button className="primary-btn" onClick={handleSave}>
           Save &amp; Mark Resolved
         </button>
       </div>
@@ -146,43 +201,93 @@ export default function ConflictView({
       {rawMode ? (
         <textarea
           className="conflict-raw-editor"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          value={rawText}
+          onChange={(e) => setRawText(e.target.value)}
           spellCheck={false}
         />
       ) : (
-        <div className="conflict-structured">
-          {blocks.map((block, i) =>
-            block.type === "context" ? (
-              <pre key={i} className="conflict-context">
-                {block.text}
-              </pre>
-            ) : (
-              <div key={i} className="conflict-hunk">
-                <div className="conflict-hunk-side conflict-hunk-ours">
-                  <div className="conflict-hunk-header">
-                    <span>{block.oursLabel}</span>
-                    <button className="toolbar-btn" onClick={() => acceptHunk(block, "ours")}>
-                      Accept Ours
-                    </button>
-                  </div>
-                  <pre>{block.ours}</pre>
-                </div>
-                <div className="conflict-hunk-side conflict-hunk-theirs">
-                  <div className="conflict-hunk-header">
-                    <span>{block.theirsLabel}</span>
-                    <button className="toolbar-btn" onClick={() => acceptHunk(block, "theirs")}>
-                      Accept Theirs
-                    </button>
-                  </div>
-                  <pre>{block.theirs}</pre>
-                </div>
-                <button className="link-btn conflict-accept-both" onClick={() => acceptHunk(block, "both")}>
-                  Accept both (ours then theirs)
-                </button>
+        <div className="conflict-3pane">
+          <div className="conflict-3pane-top">
+            <div className="conflict-pane conflict-pane-local">
+              <div className="conflict-pane-header">Local (yours)</div>
+              <div className="conflict-pane-body">
+                {segments.map((seg, i) =>
+                  seg.type === "context" ? (
+                    <ContextBlock key={i} text={seg.text} />
+                  ) : (
+                    <div key={i} className="conflict-side-block conflict-side-ours">
+                      <pre>{seg.ours}</pre>
+                      <button className="conflict-take-btn" onClick={() => pickSide(i, "ours")}>
+                        Use Local →
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
-            )
-          )}
+            </div>
+            <div className="conflict-pane conflict-pane-remote">
+              <div className="conflict-pane-header">Remote (theirs)</div>
+              <div className="conflict-pane-body">
+                {segments.map((seg, i) =>
+                  seg.type === "context" ? (
+                    <ContextBlock key={i} text={seg.text} />
+                  ) : (
+                    <div key={i} className="conflict-side-block conflict-side-theirs">
+                      <pre>{seg.theirs}</pre>
+                      <button className="conflict-take-btn" onClick={() => pickSide(i, "theirs")}>
+                        ← Use Remote
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="conflict-pane conflict-pane-result">
+            <div className="conflict-pane-header">
+              Result <span className="conflict-pane-header-hint">— edit freely; resolved conflicts stay marked and editable</span>
+            </div>
+            <div className="conflict-pane-body">
+              {segments.map((seg, i) =>
+                seg.type === "context" ? (
+                  <ContextBlock
+                    key={i}
+                    text={seg.text}
+                    editable
+                    onChange={(v) => updateContext(i, v)}
+                  />
+                ) : (
+                  <div
+                    key={i}
+                    className={"conflict-result-block" + (seg.decided ? " decided" : " undecided")}
+                  >
+                    <div className="conflict-result-block-header">
+                      <span>{seg.decided ? "Resolved conflict" : "Unresolved conflict"}</span>
+                      <div className="conflict-result-block-actions">
+                        <button className="toolbar-btn" onClick={() => pickSide(i, "ours")}>
+                          Use Local
+                        </button>
+                        <button className="toolbar-btn" onClick={() => pickSide(i, "theirs")}>
+                          Use Remote
+                        </button>
+                        <button className="toolbar-btn" onClick={() => pickSide(i, "both")}>
+                          Use Both
+                        </button>
+                      </div>
+                    </div>
+                    <textarea
+                      className="conflict-result-editable"
+                      value={seg.resolvedText}
+                      rows={Math.max(1, seg.resolvedText.split("\n").length)}
+                      spellCheck={false}
+                      placeholder="Pick a side above, or type the merged result directly…"
+                      onChange={(e) => updateConflictText(i, e.target.value)}
+                    />
+                  </div>
+                )
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

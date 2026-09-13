@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import RepoOpen from "./components/RepoOpen";
 import TabBar, { RepoTab } from "./components/TabBar";
@@ -7,11 +7,69 @@ import RepoView from "./RepoView";
 import type { RepoSummary } from "./types";
 import "./App.css";
 
+const SESSION_KEY = "ugit:openTabs";
+
+interface SavedSession {
+  paths: string[];
+  activePath: string | null;
+}
+
+function loadSession(): SavedSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session: SavedSession) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // ignore — session just won't be restored next launch
+  }
+}
+
 export default function App() {
   const [tabs, setTabs] = useState<RepoTab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [restoring, setRestoring] = useState(true);
+  const restoringRef = useRef(true);
+
+  useEffect(() => {
+    const session = loadSession();
+    if (!session || session.paths.length === 0) {
+      restoringRef.current = false;
+      setRestoring(false);
+      return;
+    }
+    (async () => {
+      const restored: RepoTab[] = [];
+      for (const path of session.paths) {
+        try {
+          const summary = await api.openRepository(path);
+          restored.push({ id: `${summary.path}-${Date.now()}-${restored.length}`, path: summary.path, name: summary.name });
+        } catch {
+          // repo no longer exists / moved — silently drop it from the restored session
+        }
+      }
+      setTabs(restored);
+      const match = restored.find((t) => t.path === session.activePath);
+      setActiveId(match ? match.id : restored[0]?.id ?? null);
+      restoringRef.current = false;
+      setRestoring(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (restoringRef.current) return;
+    const activePath = tabs.find((t) => t.id === activeId)?.path ?? null;
+    saveSession({ paths: tabs.map((t) => t.path), activePath });
+  }, [tabs, activeId]);
 
   function addTab(summary: RepoSummary) {
     const existing = tabs.find((t) => t.path === summary.path);
@@ -52,6 +110,10 @@ export default function App() {
       }
       return next;
     });
+  }
+
+  if (restoring) {
+    return <div className="app-restoring" />;
   }
 
   if (tabs.length === 0) {

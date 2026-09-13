@@ -234,7 +234,14 @@ fn compute_graph_lanes(commits: &mut [CommitInfo]) {
             },
         };
 
-        lanes[lane] = None;
+        // Any other lane also waiting for this same commit (a branch that forked
+        // from it and is now converging back) is done — free it here too, or it
+        // would sit reserved forever and lanes would only ever grow.
+        for l in lanes.iter_mut() {
+            if l.as_deref() == Some(c.id.as_str()) {
+                *l = None;
+            }
+        }
         let mut parent_lanes = Vec::new();
 
         for (pi, pid) in c.parent_ids.iter().enumerate() {

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20242b"/>
+      <stop offset="1" stop-color="#15171b"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="192" fill="url(#bg)"/>
+
+  <!-- lowercase "u", drawn as two branches curving together into one -->
+  <path d="M 352 296 L 352 610 A 160 160 0 0 0 512 770" fill="none" stroke="#4f9dde" stroke-width="56" stroke-linecap="round"/>
+  <path d="M 672 296 L 672 610 A 160 160 0 0 1 512 770" fill="none" stroke="#e0763e" stroke-width="56" stroke-linecap="round"/>
+
+  <!-- graph continuing on after the merge -->
+  <path d="M 512 770 L 512 872" fill="none" stroke="#48b8b0" stroke-width="44" stroke-linecap="round"/>
+
+  <circle cx="352" cy="296" r="50" fill="#4f9dde" stroke="#15171b" stroke-width="14"/>
+  <circle cx="672" cy="296" r="50" fill="#e0763e" stroke="#15171b" stroke-width="14"/>
+  <circle cx="512" cy="770" r="58" fill="#d9c04a" stroke="#15171b" stroke-width="14"/>
+  <circle cx="512" cy="872" r="38" fill="#48b8b0" stroke="#15171b" stroke-width="12"/>
+</svg>

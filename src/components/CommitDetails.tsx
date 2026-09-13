@@ -8,6 +8,7 @@ interface Props {
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
   onReset: (mode: "soft" | "mixed" | "hard") => void;
+  isHead: boolean;
 }
 
 function formatDate(ts: number) {
@@ -21,6 +22,7 @@ export default function CommitDetails({
   selectedPath,
   onSelectPath,
   onReset,
+  isHead,
 }: Props) {
   return (
     <div className="changes-panel">
@@ -30,18 +32,20 @@ export default function CommitDetails({
           <span>{commit.author_name}</span> · <span>{formatDate(commit.timestamp)}</span> ·{" "}
           <span className="commit-hash">{commit.short_id}</span>
         </div>
-        <div className="reset-actions">
-          <span className="reset-actions-label">Reset branch to here:</span>
-          <button className="toolbar-btn" onClick={() => onReset("soft")}>
-            Soft
-          </button>
-          <button className="toolbar-btn" onClick={() => onReset("mixed")}>
-            Mixed
-          </button>
-          <button className="danger-btn" onClick={() => onReset("hard")}>
-            Hard
-          </button>
-        </div>
+        {!isHead && (
+          <div className="reset-actions">
+            <span className="reset-actions-label">Reset branch to here:</span>
+            <button className="toolbar-btn" onClick={() => onReset("soft")}>
+              Soft
+            </button>
+            <button className="toolbar-btn" onClick={() => onReset("mixed")}>
+              Mixed
+            </button>
+            <button className="danger-btn" onClick={() => onReset("hard")}>
+              Hard
+            </button>
+          </div>
+        )}
       </div>
       <div className="changes-lists">
         <div className="changes-section">
