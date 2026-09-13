@@ -1,8 +1,19 @@
 # uGit
 
+![uGit — A visual Git client](assets/cover.png)
+
 An interactive, GitKraken-style desktop git client for Linux and Windows, built with Tauri
 (Rust + `git2`) and React. It's aimed at everyday git workflows — browsing history, staging and
 committing, branching, merging, and resolving conflicts — without leaving a GUI.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Open Repository screen](assets/screenshots/welcome.png) | ![Staging changes](assets/screenshots/staging.png) |
+| Open, create, or clone a repo to get started | Stage/unstage files and commit |
+| ![In-app 3-way merge conflict resolution](assets/screenshots/merge-conflict.png) | ![Commit graph across branches](assets/screenshots/commit-graph.png) |
+| Real 3-way merge tool for resolving conflicts | Multiple repos as tabs, with a branch/merge graph |
 
 ## Features
 
@@ -191,6 +202,12 @@ with Windows-native tooling (WiX or NSIS) — not attempted yet from this Linux 
 
 The produced `.exe` has not been run on an actual Windows machine — cross-compiling only verifies
 it builds and links correctly, not that it behaves correctly at runtime.
+
+## User manual
+
+See [docs/manual.html](docs/manual.html) (or [docs/MANUAL.md](docs/MANUAL.md)) for a full walkthrough
+of using uGit — staging, branching, merging and conflict resolution, remotes, GitHub sign-in, and
+more.
 
 ## Changelog
 

@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uGit User Manual</title>
+<style>
+  :root {
+    --bg: #15171b;
+    --panel: #1b1e24;
+    --panel-2: #20242b;
+    --border: #2b3038;
+    --text: #dde1e7;
+    --text-dim: #9aa4b2;
+    --blue: #4f9dde;
+    --orange: #e0763e;
+    --gold: #d9c04a;
+    --teal: #48b8b0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 -apple-system, "Segoe UI", "Ubuntu", Roboto, Helvetica, Arial, sans-serif;
+  }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-family: "Ubuntu Mono", "DejaVu Sans Mono", Consolas, monospace;
+    font-size: 0.9em;
+    color: #f0c46a;
+  }
+  img {
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    margin: 0.75em 0 1.25em;
+    display: block;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 28px;
+    background: linear-gradient(180deg, var(--panel-2), var(--bg));
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar .mark { flex: none; }
+  .topbar h1 {
+    font-size: 1.3rem;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  .topbar .tagline {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-left: 4px;
+  }
+
+  .layout {
+    display: flex;
+    max-width: 1180px;
+    margin: 0 auto;
+    align-items: flex-start;
+  }
+
+  nav.toc {
+    flex: none;
+    width: 260px;
+    position: sticky;
+    top: 72px;
+    align-self: flex-start;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    padding: 28px 16px 28px 28px;
+  }
+  nav.toc .label {
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 10px 12px;
+  }
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: toc;
+  }
+  nav.toc li {
+    counter-increment: toc;
+  }
+  nav.toc a {
+    display: block;
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    border-left: 2px solid transparent;
+  }
+  nav.toc a::before {
+    content: counter(toc) ". ";
+    color: var(--text-dim);
+  }
+  nav.toc a:hover {
+    background: var(--panel);
+    text-decoration: none;
+    border-left-color: var(--blue);
+  }
+
+  main {
+    flex: 1;
+    min-width: 0;
+    padding: 28px 28px 80px;
+    border-left: 1px solid var(--border);
+  }
+  main h2 {
+    margin-top: 2.4em;
+    padding-top: 0.6em;
+    border-top: 1px solid var(--border);
+    font-size: 1.4rem;
+  }
+  main h2:first-of-type { margin-top: 0.4em; border-top: none; padding-top: 0; }
+  main p { color: var(--text); }
+  main ul, main ol { padding-left: 1.4em; }
+  main li { margin: 0.35em 0; }
+  main li strong { color: #fff; }
+  main > p:first-of-type {
+    font-size: 1.08rem;
+    color: var(--text-dim);
+  }
+
+  .callout {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 1.2em 0;
+    font-size: 0.95rem;
+    color: var(--text-dim);
+  }
+
+  footer {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 24px 28px 60px 316px;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; }
+    nav.toc {
+      position: static;
+      width: 100%;
+      max-height: none;
+      padding: 20px 20px 0;
+    }
+    main { border-left: none; padding: 20px; }
+    footer { padding-left: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <svg class="mark" width="34" height="34" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="1024" height="1024" rx="192" fill="#20242b"/>
+    <path d="M 352 296 L 352 610 A 160 160 0 0 0 512 770" fill="none" stroke="#4f9dde" stroke-width="56" stroke-linecap="round"/>
+    <path d="M 672 296 L 672 610 A 160 160 0 0 1 512 770" fill="none" stroke="#e0763e" stroke-width="56" stroke-linecap="round"/>
+    <path d="M 512 770 L 512 872" fill="none" stroke="#48b8b0" stroke-width="44" stroke-linecap="round"/>
+    <circle cx="352" cy="296" r="50" fill="#4f9dde" stroke="#15171b" stroke-width="14"/>
+    <circle cx="672" cy="296" r="50" fill="#e0763e" stroke="#15171b" stroke-width="14"/>
+    <circle cx="512" cy="770" r="58" fill="#d9c04a" stroke="#15171b" stroke-width="14"/>
+    <circle cx="512" cy="872" r="38" fill="#48b8b0" stroke="#15171b" stroke-width="12"/>
+  </svg>
+  <h1>uGit User Manual</h1>
+  <span class="tagline">A visual Git client</span>
+</div>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="label">Contents</div>
+    <ol>
+<li><a href="#getting-started">Getting started</a></li>
+<li><a href="#the-main-window">The main window</a></li>
+<li><a href="#staging-and-committing">Staging and committing</a></li>
+<li><a href="#branching">Branching</a></li>
+<li><a href="#merging-and-rebasing">Merging and rebasing</a></li>
+<li><a href="#resolving-conflicts">Resolving conflicts</a></li>
+<li><a href="#resetting-a-branch">Resetting a branch</a></li>
+<li><a href="#stashing">Stashing</a></li>
+<li><a href="#remotes-fetch-pull-push">Remotes: fetch, pull, push</a></li>
+<li><a href="#github-integration">GitHub integration</a></li>
+<li><a href="#working-with-multiple-repositories">Working with multiple repositories</a></li>
+<li><a href="#searching-commit-history">Searching commit history</a></li>
+<li><a href="#session-memory">Session memory</a></li>
+<li><a href="#built-in-help">Built-in help</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ol>
+  </nav>
+  <main>
+    <p>uGit is a visual desktop client for Git. This manual walks through everyday use: opening a
+repository, staging and committing, branching, merging and resolving conflicts, working with
+remotes and GitHub, and the smaller conveniences that make it comfortable to use day to day.</p>
+<p>For installation instructions, see the <a href="../README.md">README</a>. This manual assumes uGit is
+already installed and covers using the app itself.</p>
+
+<h2 id="getting-started">Getting started</h2>
+<p>When you launch uGit with no repository open yet, you'll see the welcome screen:</p>
+<p><img alt="Open Repository screen" src="../assets/screenshots/welcome.png" /></p>
+<p>From here you can:</p>
+<ul>
+<li><strong>Open Repository…</strong> — browse to an existing local git repository and open it.</li>
+<li><strong>New Repository…</strong> — create a brand-new local repository in a folder you choose.</li>
+<li><strong>Clone from GitHub…</strong> — sign in to GitHub and pick one of your repos to clone locally.</li>
+<li><strong>Sign in to GitHub…</strong> — appears once you're not already signed in; connects your GitHub
+  account so cloning, pushing, and pulling private/SSH-restricted repos work smoothly (see
+  <a href="#github-integration">GitHub integration</a>).</li>
+</ul>
+<p>Once a repository is open, it appears as a tab at the top of the window. You can open several
+repositories at once — each gets its own tab and keeps its own state (see
+<a href="#working-with-multiple-repositories">Working with multiple repositories</a>).</p>
+<h2 id="the-main-window">The main window</h2>
+<p>Once a repository is open, the window is divided into a few areas:</p>
+<ul>
+<li><strong>Sidebar (left)</strong> — local branches, remotes, remote-tracking branches, tags, and stashes.
+  Click a branch to check it out; click a remote-tracking branch to jump the commit list to it.</li>
+<li><strong>Commit list (center-left)</strong> — "Uncommitted changes" at the top (if there are any), followed
+  by the commit history as a colored graph, one lane per line of development. Click any row to
+  view that commit's details on the right.</li>
+<li><strong>Details panel (right)</strong> — for "Uncommitted changes", this shows staging controls and diffs
+  (see <a href="#staging-and-committing">Staging and committing</a>); for a historical commit, it shows the
+  files that commit changed and their diffs.</li>
+<li><strong>Toolbar (top right)</strong> — Fetch, Pull, Push, Branch, Stash, and (per-repo) Switch repo/close.</li>
+</ul>
+<p>The current branch's name is shown next to the repo tab. A status banner appears just below the
+toolbar after actions that change repository state (e.g. "Pushed", "Fast-forwarded to feature",
+or a merge/conflict notice), and clears on the next refresh.</p>
+<h2 id="staging-and-committing">Staging and committing</h2>
+<p>Selecting <strong>Uncommitted changes</strong> shows two lists — <strong>Staged</strong> and <strong>Unstaged</strong> — and a diff
+panel:</p>
+<p><img alt="Staging changes" src="../assets/screenshots/staging.png" /></p>
+<ul>
+<li>Click a file to preview its diff (or, for a brand-new file, its full contents).</li>
+<li>Click the <code>+</code>/<code>−</code> next to a file to stage or unstage just that file, or use <strong>Stage all</strong> /
+  <strong>Unstage all</strong> for everything at once.</li>
+<li>To discard unstaged changes to a file entirely, use its discard control in the unstaged list —
+  this cannot be undone, so uGit will ask you to confirm.</li>
+<li>Type a commit message in the box at the bottom and click <strong>Commit N file(s)</strong> (only enabled
+  once at least one file is staged and the message isn't empty).</li>
+</ul>
+<p>A newly added empty file shows "Empty file added" rather than a blank/confusing diff, and a
+deleted-to-empty file shows "Empty file deleted" — these distinguish "nothing to show because
+the file has no content" from "nothing to show because nothing changed."</p>
+<h2 id="branching">Branching</h2>
+<p>Use the <strong>Branch</strong> button in the toolbar to create a new branch from the currently selected
+commit (or the current HEAD if nothing else is selected).</p>
+<p>In the sidebar, under <strong>Local Branches</strong> and <strong>Remote Branches</strong>:</p>
+<ul>
+<li>Click a branch name to check it out (local) or jump to it in the commit list (remote).</li>
+<li>Local branches show ahead/behind counts against their upstream, when one is configured.</li>
+<li>Use the icons next to a branch to rename, delete, or (for remotes) fetch just that branch.</li>
+</ul>
+<h2 id="merging-and-rebasing">Merging and rebasing</h2>
+<p>Right-click a branch (or use the action available from a selected commit) to merge or rebase it
+into your current branch. uGit performs a real merge/rebase via <code>git2</code> and reports the result in
+the status banner:</p>
+<ul>
+<li>A <strong>fast-forward</strong> merge just moves the branch pointer and says so ("Fast-forwarded to
+  <code>&lt;branch&gt;</code>").</li>
+<li>A merge that needs a real merge commit stages the result and waits for you to commit it, same
+  as staging any other change.</li>
+<li>A merge or rebase that hits conflicting changes puts the repository into a conflict state — see
+  the next section.</li>
+</ul>
+<h2 id="resolving-conflicts">Resolving conflicts</h2>
+<p>When a merge or rebase can't be resolved automatically, uGit shows a status banner naming the
+conflict (e.g. "Merging <code>conflict-a</code> (change from branch a) — 1 conflict(s) remaining") and lists
+the conflicted file(s) in the details panel. Selecting a conflicted file opens the merge tool:</p>
+<p><img alt="In-app 3-way merge conflict resolution" src="../assets/screenshots/merge-conflict.png" /></p>
+<p>The merge tool has three parts:</p>
+<ul>
+<li><strong>Local (yours)</strong> and <strong>Remote (theirs)</strong> — read-only reference panes showing each side's
+  version of the file, side by side.</li>
+<li><strong>Result</strong> — an editable pane below, pre-populated with the file as git left it (conflict
+  markers included). Long unchanged stretches of the file collapse automatically so you can focus
+  on what actually differs; click a collapsed block to expand it again.</li>
+</ul>
+<p>For each conflicting region, buttons let you resolve it directly:</p>
+<ul>
+<li><strong>Use Ours (whole file)</strong> / <strong>Use Theirs (whole file)</strong> — resolve the <em>entire</em> file to one
+  side in one click.</li>
+<li><strong>Use Local</strong> / <strong>Use Remote</strong> (per-region) — take just this region from one side.</li>
+<li><strong>Use Local</strong> / <strong>Use Remote</strong> / <strong>Use Both</strong> (in the Result pane) — pick a side for this
+  specific conflict, or keep both and edit the combination by hand.</li>
+</ul>
+<p>You can also just type directly in the Result pane — it's a normal editable text area. Resolved
+conflicts stay visibly marked (so you can see at a glance what you already handled) but remain
+editable if you change your mind.</p>
+<p>Once every conflict in a file is resolved, click <strong>Save &amp; Mark Resolved</strong>. When every conflicted
+file in the merge is resolved, the commit box at the bottom becomes available — write a message
+and commit to complete the merge. If you want to back out entirely, use <strong>Abort merge</strong> in the
+status banner instead.</p>
+<p>Other useful controls in the merge tool:</p>
+<ul>
+<li><strong>Reload from disk</strong> — if you edited the file outside uGit, reload to pick up those changes.</li>
+<li><strong>Raw editor</strong> — switch to editing the file's raw text directly, conflict markers and all, for
+  cases the guided tool doesn't fit well.</li>
+</ul>
+<h2 id="resetting-a-branch">Resetting a branch</h2>
+<p>To move the current branch pointer to an earlier commit, select that commit and choose <strong>Reset
+branch here</strong>, then pick a mode:</p>
+<ul>
+<li><strong>Soft</strong> — moves the branch pointer only; all changes since that commit stay staged.</li>
+<li><strong>Mixed</strong> — moves the branch pointer and unstages those changes (they remain in the working
+  directory).</li>
+<li><strong>Hard</strong> — moves the branch pointer and discards those changes entirely. uGit will ask you to
+  confirm, since this cannot be undone.</li>
+</ul>
+<h2 id="stashing">Stashing</h2>
+<p>Use <strong>Stash</strong> in the toolbar to save your current uncommitted changes and return to a clean
+working directory. Saved stashes appear under <strong>Stashes</strong> in the sidebar, where you can:</p>
+<ul>
+<li><strong>Apply</strong> — reapply a stash's changes without removing it from the stash list.</li>
+<li><strong>Pop</strong> — reapply a stash's changes and remove it from the list.</li>
+<li><strong>Drop</strong> — delete a stash without applying it.</li>
+</ul>
+<h2 id="remotes-fetch-pull-push">Remotes: fetch, pull, push</h2>
+<p><strong>Fetch</strong>, <strong>Pull</strong>, and <strong>Push</strong> in the toolbar act on the current branch's configured remote
+and upstream. uGit tries authentication methods in this order: SSH agent, <code>~/.ssh</code> keys, then the
+system git credential helper.</p>
+<p>If an SSH-based remote (for example, one originally set up by another tool like GitKraken) fails,
+uGit automatically retries the same operation over HTTPS using a signed-in GitHub account — see
+<a href="#github-integration">GitHub integration</a> below. This fallback never modifies the repository's
+actual configured remote (checked via <code>git remote -v</code> or another tool, it will look untouched),
+so other tools reading the same repository are unaffected.</p>
+<p>To add a new remote, use the <strong>+</strong> control under <strong>Remotes</strong> in the sidebar.</p>
+<h2 id="github-integration">GitHub integration</h2>
+<p>uGit can sign in to GitHub using its <strong>Device Flow</strong> — no password is ever typed into uGit, and
+the resulting token is stored in your OS's secure keychain (Secret Service on Linux, Credential
+Manager on Windows), not in a plain file.</p>
+<p>You can sign in proactively from the welcome screen (<strong>Sign in to GitHub…</strong>), or let uGit prompt
+you automatically: if a fetch, pull, or push fails specifically because it needs GitHub
+credentials you don't have yet, uGit opens the same sign-in flow right there and automatically
+retries the action once you're signed in — no need to click Push again yourself.</p>
+<p>Once signed in, you can also:</p>
+<ul>
+<li><strong>Clone from GitHub…</strong> on the welcome screen — browse and clone any of your repos.</li>
+<li><strong>Create on GitHub…</strong> (from a local repository without a remote yet) — creates a matching
+  GitHub repository and pushes your local history to it in one step.</li>
+</ul>
+<h2 id="working-with-multiple-repositories">Working with multiple repositories</h2>
+<p>Each repository you open gets its own tab at the top of the window. Switching tabs is instant and
+never loses in-progress work — a half-typed commit message, a partially resolved merge, a
+selected commit, all stay exactly as you left them when you switch back. Use the <strong>+</strong> next to the
+tabs to open another repository, and the <strong>×</strong> on a tab to close it.</p>
+<h2 id="searching-commit-history">Searching commit history</h2>
+<p>Use the search box above the commit list to search by commit message, author name, or a
+branch/tag reference name. Matches are highlighted in the list as you type, with a live match
+count and <strong>Next</strong>/<strong>Prev</strong> buttons to jump between them.</p>
+<h2 id="session-memory">Session memory</h2>
+<p>uGit remembers state between launches so you can pick up where you left off:</p>
+<ul>
+<li>The repositories you had open as tabs, and which tab was active, reopen automatically.</li>
+<li>The last folder you browsed to in the Open/New Repository dialog is remembered.</li>
+<li>The window's size and position are restored.</li>
+</ul>
+<h2 id="built-in-help">Built-in help</h2>
+<p>Click the <strong>?</strong> in the top-right corner of the window to open the Help panel. It covers things a
+GUI client would otherwise leave you to puzzle out yourself:</p>
+<ul>
+<li>Setting up SSH (including multiple accounts/keys).</li>
+<li>Creating a brand-new local repository.</li>
+<li>Linking a local repository to an existing remote.</li>
+<li>Creating a new remote (on GitHub) from a local repository.</li>
+</ul>
+<p>The last two topics have real buttons behind them, not just instructions — using them performs
+the action directly. The Help panel footer also shows the running app version and a link to the
+project's GitHub repository.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>Fetch/Pull/Push hangs or fails with an authentication error.</strong>
+Make sure your SSH agent has the right key loaded (<code>ssh-add -l</code>), or sign in to GitHub via
+<strong>Sign in to GitHub…</strong> so the HTTPS fallback can take over automatically.</p>
+<p><strong>A remote-tracking branch (e.g. <code>origin/main</code>) looks behind even though you just pushed.</strong>
+Click <strong>Refresh</strong> (or <strong>Fetch</strong>) — uGit updates local tracking refs after a successful push, but
+a manual refresh always reflects the latest known state.</p>
+<p><strong>Windows: the app won't start, or shows a blank window.</strong>
+uGit needs the Microsoft Edge WebView2 runtime, which ships preinstalled on Windows 11 and
+up-to-date Windows 10. See the README's Windows section for details.</p>
+<p><strong>A merge conflict file looks confusing.</strong>
+Use <strong>Reload from disk</strong> if you've been editing the file outside uGit, or switch to the <strong>Raw
+editor</strong> to work with the conflict markers directly instead of the guided panes.</p>
+<p>If something still doesn't look right, check the <a href="../CHANGELOG.md">CHANGELOG</a> for known recent
+fixes, or open an issue on the project's GitHub repository (linked in the Help panel).</p>
+  </main>
+</div>
+
+<footer>
+  Also available as <a href="MANUAL.md">MANUAL.md</a> in the repository. See the
+  <a href="../README.md">README</a> for installation instructions and the
+  <a href="../CHANGELOG.md">changelog</a> for release history.
+</footer>
+
+</body>
+</html>
