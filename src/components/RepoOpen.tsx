@@ -1,37 +1,15 @@
 import { open } from "@tauri-apps/plugin-dialog";
-
-const LAST_DIR_KEY = "ugit:lastDir";
-
-function parentDir(path: string): string {
-  const normalized = path.replace(/[/\\]+$/, "");
-  const idx = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-  return idx > 0 ? normalized.slice(0, idx) : normalized;
-}
-
-function getLastDir(): string | undefined {
-  try {
-    return localStorage.getItem(LAST_DIR_KEY) ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function rememberDir(path: string) {
-  try {
-    localStorage.setItem(LAST_DIR_KEY, parentDir(path));
-  } catch {
-    // ignore — falls back to the platform default next time
-  }
-}
+import { getLastDir, rememberDir } from "../lastDir";
 
 interface Props {
   onOpen: (path: string) => void;
   onCreate: (path: string) => void;
+  onClone: () => void;
   onHelp: () => void;
   error: string | null;
 }
 
-export default function RepoOpen({ onOpen, onCreate, onHelp, error }: Props) {
+export default function RepoOpen({ onOpen, onCreate, onClone, onHelp, error }: Props) {
   async function pickFolder() {
     const selected = await open({
       directory: true,
@@ -68,6 +46,9 @@ export default function RepoOpen({ onOpen, onCreate, onHelp, error }: Props) {
         </button>
         <button className="toolbar-btn" onClick={pickFolderForNew}>
           New Repository…
+        </button>
+        <button className="toolbar-btn" onClick={onClone}>
+          Clone from GitHub…
         </button>
       </div>
       <button className="link-btn repo-open-help" onClick={onHelp}>

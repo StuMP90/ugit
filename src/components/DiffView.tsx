@@ -23,6 +23,12 @@ export default function DiffView({ diff, loading }: Props) {
     return <div className="diff-view empty">Binary file not shown</div>;
   }
   if (diff.hunks.length === 0) {
+    if (diff.status === "added") {
+      return <div className="diff-view empty">Empty file added</div>;
+    }
+    if (diff.status === "deleted") {
+      return <div className="diff-view empty">Empty file deleted</div>;
+    }
     return <div className="diff-view empty">No changes</div>;
   }
 

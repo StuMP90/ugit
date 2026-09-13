@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+const REPO_URL = "https://github.com/StuMP90/ugit";
 
 interface Topic {
   id: string;
@@ -84,16 +88,20 @@ git@github.com-work:yourcompany/work-repo.git`}</pre>
     body: (
       <>
         <p>
-          uGit can't create the repository on GitHub/GitLab/Bitbucket itself — that needs the
-          site's API and an access token, which isn't wired up yet. The steps today:
+          For GitHub specifically, uGit can do this for you: hit <strong>Push</strong> on a repo
+          with no remotes and choose <strong>Create on GitHub…</strong>. It'll ask you to sign in
+          (a device code you approve in your browser, no password stored in uGit), then let you
+          name the new repository, set it public or private, and it creates it, sets it as{" "}
+          <code>origin</code>, and pushes — all in one step.
         </p>
+        <p>For any other host (GitLab, Bitbucket, etc.), the steps are still manual:</p>
         <p>
           <strong>1.</strong> On the hosting site, create a new, empty repository (don't let it
           add a README, license, or .gitignore — an empty local and empty remote merge cleanest).
         </p>
         <p>
           <strong>2.</strong> Copy the URL it gives you (SSH form is usually easiest, e.g.{" "}
-          <code>git@github.com:you/repo.git</code>).
+          <code>git@gitlab.com:you/repo.git</code>).
         </p>
         <p>
           <strong>3.</strong> Back in uGit, follow "Connect a local repository to an existing
@@ -110,6 +118,13 @@ interface Props {
 
 export default function HelpModal({ onClose }: Props) {
   const [openId, setOpenId] = useState<string>(TOPICS[0].id);
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -136,6 +151,13 @@ export default function HelpModal({ onClose }: Props) {
               </div>
             );
           })}
+        </div>
+        <div className="help-modal-footer">
+          <span>{version ? `uGit v${version}` : "uGit"}</span>
+          <span className="help-modal-footer-sep">·</span>
+          <button className="link-btn" onClick={() => openUrl(REPO_URL).catch(() => {})}>
+            GitHub: StuMP90/ugit
+          </button>
         </div>
       </div>
     </div>

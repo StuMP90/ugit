@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   BranchInfo,
   CommitInfo,
+  DeviceCodeInfo,
+  DevicePollResult,
   FileDiff,
+  GithubRepo,
   MergeOutcome,
   RebaseProgress,
   RemoteInfo,
@@ -120,4 +123,23 @@ export const api = {
 
   resetToCommit: (repoPath: string, commitId: string, mode: "soft" | "mixed" | "hard") =>
     invoke<void>("reset_to_commit", { repoPath, commitId, mode }),
+
+  cloneRepository: (url: string, into: string) =>
+    invoke<RepoSummary>("clone_repository", { url, into }),
+
+  githubStartDeviceFlow: () => invoke<DeviceCodeInfo>("github_start_device_flow"),
+
+  githubPollDeviceFlow: (deviceCode: string) =>
+    invoke<DevicePollResult>("github_poll_device_flow", { deviceCode }),
+
+  githubIsSignedIn: () => invoke<boolean>("github_is_signed_in"),
+
+  githubSignOut: () => invoke<void>("github_sign_out"),
+
+  githubGetUsername: () => invoke<string>("github_get_username"),
+
+  githubListRepos: () => invoke<GithubRepo[]>("github_list_repos"),
+
+  githubCreateRepo: (name: string, private_: boolean, description: string | null) =>
+    invoke<GithubRepo>("github_create_repo", { name, private: private_, description }),
 };

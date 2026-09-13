@@ -23,6 +23,7 @@ import MergeRebaseBanner from "./components/MergeRebaseBanner";
 import PromptModal from "./components/PromptModal";
 import ConfirmDialog from "./components/ConfirmDialog";
 import AddRemoteModal from "./components/AddRemoteModal";
+import GitHubModal from "./components/GitHubModal";
 
 type Modal = null | "branch" | "stash";
 
@@ -67,6 +68,8 @@ export default function RepoView({ repoPath }: Props) {
   const [modal, setModal] = useState<Modal>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [addRemoteOpen, setAddRemoteOpen] = useState(false);
+  const [noRemoteChoiceOpen, setNoRemoteChoiceOpen] = useState(false);
+  const [githubPushOpen, setGithubPushOpen] = useState(false);
 
   const [commitSearch, setCommitSearch] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
@@ -271,13 +274,19 @@ export default function RepoView({ repoPath }: Props) {
           await refreshAll();
           setInfo(msg);
         })}
-        onPush={() => runAction(async () => {
-          if (!status?.branch) throw new Error("No current branch");
-          const b = branches.find((br) => !br.is_remote && br.name === status.branch);
-          await api.push(repoPath, "origin", status.branch, !b?.upstream);
-          await refreshAll();
-          setInfo("Pushed");
-        })}
+        onPush={() => {
+          if (remotes.length === 0) {
+            setNoRemoteChoiceOpen(true);
+            return;
+          }
+          runAction(async () => {
+            if (!status?.branch) throw new Error("No current branch");
+            const b = branches.find((br) => !br.is_remote && br.name === status.branch);
+            await api.push(repoPath, "origin", status.branch, !b?.upstream);
+            await refreshAll();
+            setInfo("Pushed");
+          });
+        }}
         onStash={() => setModal("stash")}
         onNewBranch={() => setModal("branch")}
       />
@@ -675,6 +684,61 @@ export default function RepoView({ repoPath }: Props) {
               await refreshAll();
               setInfo(`Added remote "${name}"`);
             });
+          }}
+        />
+      )}
+
+      {noRemoteChoiceOpen && (
+        <div className="modal-backdrop" onClick={() => setNoRemoteChoiceOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <p className="confirm-message">There are no remotes to push to. Would you like to add one?</p>
+            <div className="modal-actions">
+              <button className="toolbar-btn subtle" onClick={() => setNoRemoteChoiceOpen(false)}>
+                Cancel
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => {
+                  setNoRemoteChoiceOpen(false);
+                  setAddRemoteOpen(true);
+                }}
+              >
+                Add existing remote…
+              </button>
+              <button
+                className="primary-btn"
+                onClick={() => {
+                  setNoRemoteChoiceOpen(false);
+                  setGithubPushOpen(true);
+                }}
+              >
+                Create on GitHub…
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {githubPushOpen && (
+        <GitHubModal
+          purpose="push"
+          suggestedName={repoPath.split(/[/\\]/).filter(Boolean).pop()}
+          onCancel={() => setGithubPushOpen(false)}
+          onCloned={() => {}}
+          onRepoReady={(repo) => {
+            setGithubPushOpen(false);
+            runAction(async () => {
+              await api.addRemote(repoPath, "origin", repo.clone_url);
+              await refreshAll();
+              if (!status?.branch) throw new Error("No current branch");
+              await api.push(repoPath, "origin", status.branch, true);
+              await refreshAll();
+              setInfo(`Created ${repo.full_name} and pushed`);
+            });
+          }}
+          onError={(msg) => {
+            setGithubPushOpen(false);
+            setError(msg);
           }}
         />
       )}

@@ -168,6 +168,8 @@ button {
 .repo-open-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .repo-open-help {
   margin-top: 14px;
@@ -976,6 +978,98 @@ button {
   color: var(--text-1);
 }
 
+/* ---------- GitHub modal ---------- */
+
+.github-modal {
+  width: 420px;
+  max-width: 90vw;
+}
+.github-device-flow {
+  text-align: center;
+}
+.github-device-code {
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 28px;
+  letter-spacing: 4px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 10px 0;
+}
+.github-clone-target {
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px;
+}
+.github-signed-in-as {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+}
+.github-visibility-row select {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-0);
+  padding: 8px;
+  border-radius: 4px;
+}
+.github-repo-filter {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-0);
+  padding: 8px;
+  border-radius: 4px;
+}
+.github-repo-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.github-repo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.github-repo-row:last-child {
+  border-bottom: none;
+}
+.github-repo-row:hover {
+  background: var(--bg-1);
+}
+.github-repo-row.selected {
+  background: var(--bg-3);
+}
+.github-repo-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.github-repo-badge {
+  font-size: 10px;
+  border-radius: 8px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.github-repo-badge.private {
+  background: #3a3320;
+  color: #e0c34e;
+}
+.github-repo-badge.public {
+  background: #1f3a2b;
+  color: var(--success);
+}
+
 /* ---------- Help modal ---------- */
 
 .help-modal {
@@ -996,6 +1090,19 @@ button {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.help-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-2);
+}
+.help-modal-footer-sep {
+  opacity: 0.5;
 }
 .help-topic {
   border: 1px solid var(--border);

@@ -3,6 +3,7 @@ import { api } from "./api";
 import RepoOpen from "./components/RepoOpen";
 import TabBar, { RepoTab } from "./components/TabBar";
 import HelpModal from "./components/HelpModal";
+import GitHubModal from "./components/GitHubModal";
 import RepoView from "./RepoView";
 import type { RepoSummary } from "./types";
 import "./App.css";
@@ -36,6 +37,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const restoringRef = useRef(true);
 
@@ -116,16 +118,34 @@ export default function App() {
     return <div className="app-restoring" />;
   }
 
+  const cloneModal = cloneOpen && (
+    <GitHubModal
+      purpose="clone"
+      onCancel={() => setCloneOpen(false)}
+      onRepoReady={() => {}}
+      onCloned={async (path) => {
+        setCloneOpen(false);
+        await handleOpen(path);
+      }}
+      onError={(msg) => {
+        setCloneOpen(false);
+        setOpenError(msg);
+      }}
+    />
+  );
+
   if (tabs.length === 0) {
     return (
       <>
         <RepoOpen
           onOpen={handleOpen}
           onCreate={handleCreate}
+          onClone={() => setCloneOpen(true)}
           onHelp={() => setHelpOpen(true)}
           error={openError}
         />
         {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+        {cloneModal}
       </>
     );
   }
@@ -154,12 +174,14 @@ export default function App() {
           <RepoOpen
             onOpen={handleOpen}
             onCreate={handleCreate}
+            onClone={() => setCloneOpen(true)}
             onHelp={() => setHelpOpen(true)}
             error={openError}
           />
         )}
       </div>
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+      {cloneModal}
     </div>
   );
 }

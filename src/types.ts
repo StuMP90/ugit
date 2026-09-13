@@ -101,3 +101,26 @@ export interface RebaseProgress {
   total: number;
   current_summary: string;
 }
+
+export interface DeviceCodeInfo {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export interface DevicePollResult {
+  status: string; // "pending" | "success" | "denied" | "expired" | "slow_down" | "error"
+  message: string | null;
+}
+
+export interface GithubRepo {
+  name: string;
+  full_name: string;
+  private: boolean;
+  description: string | null;
+  clone_url: string;
+  ssh_url: string;
+  updated_at: string;
+}

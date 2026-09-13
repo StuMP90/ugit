@@ -31,6 +31,9 @@ fn remote_callbacks<'a>() -> git2::RemoteCallbacks<'a> {
         if allowed_types.contains(CredentialType::USER_PASS_PLAINTEXT)
             || allowed_types.contains(CredentialType::DEFAULT)
         {
+            if let Some(cred) = crate::github::github_https_credentials(url) {
+                return Ok(cred);
+            }
             if let Ok(cfg) = git2::Config::open_default() {
                 if let Ok(cred) = Cred::credential_helper(&cfg, url, username_from_url) {
                     return Ok(cred);
@@ -38,7 +41,7 @@ fn remote_callbacks<'a>() -> git2::RemoteCallbacks<'a> {
             }
         }
         Err(git2::Error::from_str(
-            "No valid credentials found (tried ssh-agent, ~/.ssh keys, and git credential helper)",
+            "No valid credentials found (tried ssh-agent, ~/.ssh keys, signed-in GitHub account, and git credential helper)",
         ))
     });
     cb
@@ -325,6 +328,29 @@ pub fn init_repository(path: String) -> Result<RepoSummary, String> {
     let workdir = repo
         .workdir()
         .ok_or_else(|| "Repository has no working directory (bare repo?)".to_string())?
+        .to_path_buf();
+    let name = workdir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| workdir.to_string_lossy().to_string());
+
+    Ok(RepoSummary {
+        path: workdir.to_string_lossy().to_string(),
+        name,
+    })
+}
+
+#[tauri::command]
+pub fn clone_repository(url: String, into: String) -> Result<RepoSummary, String> {
+    let mut fetch_opts = git2::FetchOptions::new();
+    fetch_opts.remote_callbacks(remote_callbacks());
+    let repo = git2::build::RepoBuilder::new()
+        .fetch_options(fetch_opts)
+        .clone(&url, std::path::Path::new(&into))
+        .map_err(|e| e.to_string())?;
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| "Cloned repository has no working directory (bare repo?)".to_string())?
         .to_path_buf();
     let name = workdir
         .file_name()
