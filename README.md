@@ -23,7 +23,15 @@ committing, branching, merging, and resolving conflicts — without leaving a GU
 - **Branch reset** — soft/mixed/hard reset the current branch to any earlier commit.
 - **Stashing** — save, apply, pop, and drop stashes.
 - **Remotes** — add remotes, and fetch/pull/push with SSH-agent, `~/.ssh` key, and git
-  credential-helper authentication, tried in that order.
+  credential-helper authentication, tried in that order. If an SSH remote (e.g. one set up by
+  another tool like GitKraken) fails, uGit automatically retries over HTTPS using a signed-in
+  GitHub account — without ever touching the repo's actual configured remote, so other tools
+  reading the same repo are unaffected.
+- **GitHub integration** — sign in via GitHub's Device Flow (no password ever touches uGit; the
+  token is stored in the OS keychain), create a new GitHub repo and push to it in one step, and
+  browse/clone your GitHub repos from the Open Repository screen. If an action needs GitHub auth
+  you don't have yet, uGit prompts for it right there and retries automatically once you're
+  signed in.
 - **Session memory** — reopens the same tabs (and the same active tab) you had open last time,
   remembers the last folder you browsed to in the Open/New Repository dialog, and restores the
   window's size and position.

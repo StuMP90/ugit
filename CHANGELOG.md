@@ -3,6 +3,17 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.3] - 2026-09-13
+
+### Fixed
+- After a push succeeded via the SSH→HTTPS fallback (new in 0.1.2), the local
+  `origin/<branch>` tracking ref didn't move — GitHub had the real commit,
+  but uGit kept showing `origin/<branch>` behind. Pushing through a named
+  remote updates the local tracking ref automatically (via its configured
+  refspec); the fallback's anonymous remote has no such refspec, so it never
+  did. Fixed by updating the tracking ref explicitly after a successful
+  fallback push.
+
 ## [0.1.2] - 2026-09-13
 
 ### Fixed
@@ -24,6 +35,8 @@ All notable changes to uGit are documented here. Format loosely follows
   (shown only when not already signed in). Fetch/Pull/Push failures that
   specifically need GitHub auth now open this same flow and automatically
   retry the action once you're signed in.
+- A `LICENSE` (AGPLv3 with the Commons Clause — open source, but not for
+  resale) and this changelog, both linked from the README.
 
 ## [0.1.1] - 2026-09-13
 

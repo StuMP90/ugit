@@ -956,6 +956,21 @@ pub fn push(
             opts2.remote_callbacks(remote_callbacks());
             anon.push(&[refspec.as_str()], Some(&mut opts2))
                 .map_err(|e| e.to_string())?;
+            // Unlike a push through the named remote, an anonymous remote has
+            // no configured refspec to auto-update the local remote-tracking
+            // branch — without this, origin/<branch> would keep pointing at
+            // the pre-push commit even though the push itself succeeded.
+            let local_oid = repo
+                .find_branch(&branch, BranchType::Local)
+                .and_then(|b| b.get().target().ok_or_else(|| git2::Error::from_str("no target")))
+                .map_err(|e| e.to_string())?;
+            repo.reference(
+                &format!("refs/remotes/{remote}/{branch}"),
+                local_oid,
+                true,
+                "push (https fallback)",
+            )
+            .map_err(|e| e.to_string())?;
         }
         Ok(()) => {}
     }
