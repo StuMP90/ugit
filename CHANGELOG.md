@@ -3,6 +3,38 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.5] - 2026-09-13
+
+### Fixed
+- **Windows build showed "localhost refused to connect" instead of the app.**
+  The documented cross-compile command built the app in Tauri's *dev* mode
+  (`generate_context!()` bakes in `dev: cfg!(not(feature = "custom-protocol"))`),
+  so the exe tried to load the Vite dev server at `http://localhost:1420`
+  instead of the frontend bundled into the binary. `npm run tauri build`
+  (used for the Linux bundles) adds `--features tauri/custom-protocol`
+  automatically; the raw `cargo build` cross-compile command documented for
+  Windows did not. Fixed by adding that feature flag to the documented
+  command — confirmed via the rebuilt exe embedding this build's actual
+  hashed asset filenames (`index-*.js`/`.css`), which the previous build did
+  not.
+
+## [0.1.4] - 2026-09-13
+
+### Fixed
+- **Windows build failed to start with a missing `libunwind.dll` error.** The
+  `x86_64-pc-windows-gnullvm` cross-compile target linked the `llvm-mingw`
+  toolchain's unwind runtime dynamically by default, pulling in a DLL that
+  Windows doesn't ship and that wasn't distributed alongside `ugit.exe`.
+  Fixed by statically linking the CRT/unwind runtime
+  (`-C target-feature=+crt-static`) — confirmed via the built exe's import
+  table that the dependency is gone.
+
+### Documentation
+- The README's Windows section now explains that `WebView2Loader.dll` (built
+  automatically next to `ugit.exe`) must be copied alongside it — this was
+  always required (every WebView2 app needs it) but wasn't previously
+  documented, leading to a confusing missing-DLL error on first run.
+
 ## [0.1.3] - 2026-09-13
 
 ### Fixed

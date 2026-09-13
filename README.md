@@ -165,11 +165,30 @@ Then build:
 ```bash
 cd src-tauri
 TC=~/toolchains/llvm-mingw-*-ucrt-ubuntu-22.04-x86_64
-PATH="$TC/bin:$PATH" cargo build --release --target x86_64-pc-windows-gnullvm --bin ugit
+PATH="$TC/bin:$PATH" cargo build --release --target x86_64-pc-windows-gnullvm --bin ugit \
+  --features tauri/custom-protocol
 ```
 
-Output: `src-tauri/target/x86_64-pc-windows-gnullvm/release/ugit.exe` — a standalone,
-self-contained executable (no installer is produced by this path; see below).
+**`--features tauri/custom-protocol` is required, not optional.** `npm run tauri build` (the
+normal Linux path) adds this automatically; a raw `cargo build` doesn't. Without it, Tauri's
+`generate_context!()` macro bakes in `dev: true`, and the built app tries to load the Vite dev
+server (`http://localhost:1420`) instead of the frontend bundled into the exe — on a machine
+without that dev server running, WebView2 shows "localhost refused to connect" and the app never
+gets past a blank/error window. This is easy to get wrong because the build still *succeeds*
+either way; the only symptom is at runtime.
+
+Output: `src-tauri/target/x86_64-pc-windows-gnullvm/release/ugit.exe`, plus
+`WebView2Loader.dll` in that same folder (no installer is produced by this path; see below).
+
+**Both files must travel together.** `ugit.exe` is statically linked (CRT and the toolchain's
+unwind runtime are baked in via `-C target-feature=+crt-static` in
+`src-tauri/.cargo/config.toml`, avoiding a dependency on `libunwind.dll`, which Windows doesn't
+ship and which the `gnullvm` toolchain otherwise links dynamically by default) — but
+`WebView2Loader.dll` is a small loader stub that every WebView2 app needs sitting next to its
+`.exe` regardless of how the app itself was built or linked; this is normal (the same requirement
+any Chromium-embedding app has), not something specific to uGit's cross-compiled build. The build
+already places it next to `ugit.exe`; just make sure both come along when you copy the exe
+somewhere else.
 
 **Gotcha:** if you only changed frontend files (nothing under `src-tauri/src/`) since the last
 Windows build, plain `cargo build` won't notice `dist/` changed and will silently skip rebuilding
@@ -190,9 +209,10 @@ can't hold the symbol count a `cdylib` build of this dependency tree produces.
 
 ### Installing / updating on Windows
 
-There's currently no installer (`.msi`/NSIS) — just the portable `ugit.exe` above. "Installing" is
-copying it wherever you like; "updating" is replacing it with a newly built one. No registry
-entries, shortcuts, or uninstaller are created.
+There's currently no installer (`.msi`/NSIS) — just the portable `ugit.exe` and
+`WebView2Loader.dll` above. "Installing" is copying both files, together, to the same folder
+wherever you like; "updating" is replacing them with newly built ones. No registry entries,
+shortcuts, or uninstaller are created.
 
 **Requires Windows 11** (or an updated Windows 10) — uGit needs the Microsoft Edge WebView2
 runtime to render its UI, which ships preinstalled on those. Building a proper installer that can
@@ -219,3 +239,6 @@ See [CHANGELOG.md](CHANGELOG.md) for what's changed in each version.
 the source is open, you're free to use, modify, and redistribute it, and any distributed
 modifications must stay open under the same terms — but nobody may sell it or offer it as a paid
 service without separate permission.
+
+The Windows build also bundles one small third-party binary (Microsoft's `WebView2Loader.dll`)
+under its own license terms — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

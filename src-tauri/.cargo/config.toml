@@ -5,3 +5,4 @@ ar = "x86_64-w64-mingw32-ar"
 [target.x86_64-pc-windows-gnullvm]
 linker = "/home/stuart/toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-clang"
 ar = "/home/stuart/toolchains/llvm-mingw-20260908-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-ar"
+rustflags = ["-C", "target-feature=+crt-static"]
