@@ -1309,3 +1309,6 @@ pub fn resolve_conflict(repo_path: String, path: String, side: String) -> Result
     index.write().map_err(|e| e.to_string())?;
     Ok(())
 }
+
+
+
