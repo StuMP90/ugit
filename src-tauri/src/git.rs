@@ -9,18 +9,31 @@ fn open_repo(repo_path: &str) -> Result<Repository, String> {
 
 fn remote_callbacks<'a>() -> git2::RemoteCallbacks<'a> {
     let mut cb = git2::RemoteCallbacks::new();
-    cb.credentials(|url, username_from_url, allowed_types| {
+    // libgit2 calls this callback again each time the previously-offered
+    // credential is rejected, so it must remember what it has already tried
+    // — otherwise a method that "succeeds" at construction time but always
+    // fails authentication (e.g. an ssh-agent with no loaded keys) gets
+    // re-offered forever, turning a fast, correct failure into a multi-retry
+    // stall that can take the better part of a minute.
+    let mut tried_agent = false;
+    let mut tried_keys: Vec<PathBuf> = Vec::new();
+    let mut tried_https = false;
+    cb.credentials(move |url, username_from_url, allowed_types| {
         if allowed_types.contains(CredentialType::SSH_KEY) {
             if let Some(user) = username_from_url {
-                if let Ok(cred) = Cred::ssh_key_from_agent(user) {
-                    return Ok(cred);
+                if !tried_agent {
+                    tried_agent = true;
+                    if let Ok(cred) = Cred::ssh_key_from_agent(user) {
+                        return Ok(cred);
+                    }
                 }
                 let home = std::env::var("HOME")
                     .or_else(|_| std::env::var("USERPROFILE"))
                     .unwrap_or_default();
                 for key in ["id_ed25519", "id_rsa", "id_ecdsa"] {
                     let priv_path = PathBuf::from(&home).join(".ssh").join(key);
-                    if priv_path.exists() {
+                    if priv_path.exists() && !tried_keys.contains(&priv_path) {
+                        tried_keys.push(priv_path.clone());
                         if let Ok(cred) = Cred::ssh_key(user, None, &priv_path, None) {
                             return Ok(cred);
                         }
@@ -31,12 +44,15 @@ fn remote_callbacks<'a>() -> git2::RemoteCallbacks<'a> {
         if allowed_types.contains(CredentialType::USER_PASS_PLAINTEXT)
             || allowed_types.contains(CredentialType::DEFAULT)
         {
-            if let Some(cred) = crate::github::github_https_credentials(url) {
-                return Ok(cred);
-            }
-            if let Ok(cfg) = git2::Config::open_default() {
-                if let Ok(cred) = Cred::credential_helper(&cfg, url, username_from_url) {
+            if !tried_https {
+                tried_https = true;
+                if let Some(cred) = crate::github::github_https_credentials(url) {
                     return Ok(cred);
+                }
+                if let Ok(cfg) = git2::Config::open_default() {
+                    if let Ok(cred) = Cred::credential_helper(&cfg, url, username_from_url) {
+                        return Ok(cred);
+                    }
                 }
             }
         }
@@ -817,6 +833,30 @@ pub fn delete_branch(repo_path: String, name: String, is_remote: bool) -> Result
     Ok(())
 }
 
+/// Retries a failed fetch over HTTPS with the signed-in GitHub token, without
+/// ever touching the repo's persisted remote config — so other tools reading
+/// the same repo (e.g. GitKraken, pointed at an SSH remote it manages its own
+/// key for) are completely unaffected by this fallback ever having happened.
+fn fetch_via_https_fallback(
+    repo: &Repository,
+    original_url: Option<&str>,
+    refspecs: &[&str],
+    original_err: &git2::Error,
+) -> Result<(), String> {
+    let https_url = match original_url.and_then(crate::github::github_ssh_to_https) {
+        Some(u) => u,
+        None => return Err(original_err.to_string()),
+    };
+    if !crate::github::has_stored_token() {
+        return Err(crate::github::NEEDS_GITHUB_AUTH.to_string());
+    }
+    let mut anon = repo.remote_anonymous(&https_url).map_err(|e| e.to_string())?;
+    let mut opts = git2::FetchOptions::new();
+    opts.remote_callbacks(remote_callbacks());
+    anon.fetch(refspecs, Some(&mut opts), None)
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn fetch(repo_path: String, remote: Option<String>) -> Result<(), String> {
     let repo = open_repo(&repo_path)?;
@@ -824,9 +864,10 @@ pub fn fetch(repo_path: String, remote: Option<String>) -> Result<(), String> {
     let mut r = repo.find_remote(&remote_name).map_err(|e| e.to_string())?;
     let mut opts = git2::FetchOptions::new();
     opts.remote_callbacks(remote_callbacks());
-    r.fetch(&[] as &[&str], Some(&mut opts), None)
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    match r.fetch(&[] as &[&str], Some(&mut opts), None) {
+        Err(e) => fetch_via_https_fallback(&repo, r.url(), &[], &e),
+        Ok(()) => Ok(()),
+    }
 }
 
 #[tauri::command]
@@ -857,8 +898,10 @@ pub fn pull(repo_path: String) -> Result<String, String> {
     let mut opts = git2::FetchOptions::new();
     opts.remote_callbacks(remote_callbacks());
     let refspec = format!("refs/heads/{remote_branch}");
-    r.fetch(&[refspec.as_str()], Some(&mut opts), None)
-        .map_err(|e| e.to_string())?;
+    match r.fetch(&[refspec.as_str()], Some(&mut opts), None) {
+        Err(e) => fetch_via_https_fallback(&repo, r.url(), &[refspec.as_str()], &e)?,
+        Ok(()) => {}
+    }
 
     let fetch_head = repo.find_reference("FETCH_HEAD").map_err(|e| e.to_string())?;
     let fetch_commit = repo
@@ -899,8 +942,23 @@ pub fn push(
     let mut opts = git2::PushOptions::new();
     opts.remote_callbacks(remote_callbacks());
     let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
-    r.push(&[refspec.as_str()], Some(&mut opts))
-        .map_err(|e| e.to_string())?;
+    match r.push(&[refspec.as_str()], Some(&mut opts)) {
+        Err(e) => {
+            let https_url = match r.url().and_then(crate::github::github_ssh_to_https) {
+                Some(u) => u,
+                None => return Err(e.to_string()),
+            };
+            if !crate::github::has_stored_token() {
+                return Err(crate::github::NEEDS_GITHUB_AUTH.to_string());
+            }
+            let mut anon = repo.remote_anonymous(&https_url).map_err(|e| e.to_string())?;
+            let mut opts2 = git2::PushOptions::new();
+            opts2.remote_callbacks(remote_callbacks());
+            anon.push(&[refspec.as_str()], Some(&mut opts2))
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(()) => {}
+    }
 
     if set_upstream {
         let mut local_branch = repo
@@ -1309,6 +1367,3 @@ pub fn resolve_conflict(repo_path: String, path: String, side: String) -> Result
     index.write().map_err(|e| e.to_string())?;
     Ok(())
 }
-
-
-

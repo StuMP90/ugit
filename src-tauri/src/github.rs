@@ -9,6 +9,13 @@ const GITHUB_CLIENT_ID: &str = "Ov23liBRt1SEafkCSGwH";
 const KEYRING_SERVICE: &str = "ugit";
 const KEYRING_USERNAME: &str = "github";
 
+/// Sentinel error string: signals "this operation would have a real recovery
+/// path (the HTTPS-with-token fallback) if the user were signed in to
+/// GitHub, but isn't" — distinct from an ordinary failure, so the frontend
+/// can offer the sign-in flow directly instead of just showing a dead-end
+/// error banner.
+pub const NEEDS_GITHUB_AUTH: &str = "NEEDS_GITHUB_AUTH";
+
 fn keyring_entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).map_err(|e| e.to_string())
 }
@@ -200,4 +207,28 @@ pub fn github_https_credentials(url: &str) -> Option<git2::Cred> {
     }
     let token = load_token().ok().flatten()?;
     git2::Cred::userpass_plaintext(&token, "x-oauth-basic").ok()
+}
+
+/// Whether a GitHub token is currently stored, without making any network or
+/// git calls — used to decide up front whether an HTTPS fallback is even
+/// worth attempting.
+pub fn has_stored_token() -> bool {
+    load_token().ok().flatten().is_some()
+}
+
+/// If `url` is a github.com SSH remote (either form git normally produces —
+/// the `git@github.com:owner/repo.git` scp-like syntax, or `ssh://`), return
+/// the equivalent HTTPS URL. Used to retry over HTTPS (with the signed-in
+/// token) when SSH auth fails, without ever touching the repo's configured
+/// remote — so other tools (e.g. GitKraken) that rely on the SSH remote
+/// staying exactly as they set it up are unaffected.
+pub fn github_ssh_to_https(url: &str) -> Option<String> {
+    let rest = url
+        .strip_prefix("git@github.com:")
+        .or_else(|| url.strip_prefix("ssh://git@github.com/"))?;
+    let rest = rest.trim_end_matches('/');
+    if rest.is_empty() {
+        return None;
+    }
+    Some(format!("https://github.com/{rest}"))
 }

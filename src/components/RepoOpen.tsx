@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getLastDir, rememberDir } from "../lastDir";
+import { api } from "../api";
+import GitHubModal from "./GitHubModal";
 
 interface Props {
   onOpen: (path: string) => void;
@@ -10,6 +13,15 @@ interface Props {
 }
 
 export default function RepoOpen({ onOpen, onCreate, onClone, onHelp, error }: Props) {
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [signInOpen, setSignInOpen] = useState(false);
+
+  useEffect(() => {
+    api
+      .githubIsSignedIn()
+      .then(setSignedIn)
+      .catch(() => setSignedIn(false));
+  }, []);
   async function pickFolder() {
     const selected = await open({
       directory: true,
@@ -50,11 +62,29 @@ export default function RepoOpen({ onOpen, onCreate, onClone, onHelp, error }: P
         <button className="toolbar-btn" onClick={onClone}>
           Clone from GitHub…
         </button>
+        {signedIn === false && (
+          <button className="toolbar-btn" onClick={() => setSignInOpen(true)}>
+            Sign in to GitHub…
+          </button>
+        )}
       </div>
       <button className="link-btn repo-open-help" onClick={onHelp}>
         Need help getting started?
       </button>
       {error && <div className="error-banner">{error}</div>}
+      {signInOpen && (
+        <GitHubModal
+          purpose="signin"
+          onCancel={() => setSignInOpen(false)}
+          onRepoReady={() => {}}
+          onCloned={() => {}}
+          onSignedIn={() => {
+            setSignedIn(true);
+            setSignInOpen(false);
+          }}
+          onError={() => setSignInOpen(false)}
+        />
+      )}
     </div>
   );
 }

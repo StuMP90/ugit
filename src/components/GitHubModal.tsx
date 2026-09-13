@@ -5,7 +5,7 @@ import { api } from "../api";
 import type { DeviceCodeInfo, GithubRepo } from "../types";
 import { getLastDir, rememberDir } from "../lastDir";
 
-type Purpose = "push" | "clone";
+type Purpose = "push" | "clone" | "signin";
 
 interface Props {
   purpose: Purpose;
@@ -13,6 +13,7 @@ interface Props {
   onCancel: () => void;
   onRepoReady: (repo: GithubRepo) => void;
   onCloned: (path: string) => void;
+  onSignedIn?: () => void;
   onError: (message: string) => void;
 }
 
@@ -22,6 +23,7 @@ export default function GitHubModal({
   onCancel,
   onRepoReady,
   onCloned,
+  onSignedIn,
   onError,
 }: Props) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -167,13 +169,25 @@ export default function GitHubModal({
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal github-modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{purpose === "push" ? "Create a GitHub repository" : "Clone from GitHub"}</h3>
+        <h3>
+          {purpose === "push"
+            ? "Create a GitHub repository"
+            : purpose === "clone"
+            ? "Clone from GitHub"
+            : "Sign in to GitHub"}
+        </h3>
 
         {signedIn === null && <p className="empty-hint">Checking sign-in status…</p>}
 
         {signedIn === false && !device && (
           <>
-            <p>Sign in to GitHub to {purpose === "push" ? "create a repository" : "browse your repositories"}.</p>
+            <p>
+              {purpose === "push"
+                ? "Sign in to GitHub to create a repository."
+                : purpose === "clone"
+                ? "Sign in to GitHub to browse your repositories."
+                : "Sign in to GitHub so uGit can push, pull, and browse your repositories — including falling back to this automatically if an SSH remote (e.g. one set up by another tool) doesn't work."}
+            </p>
             <div className="modal-actions">
               <button className="toolbar-btn subtle" onClick={onCancel}>
                 Cancel
@@ -203,6 +217,14 @@ export default function GitHubModal({
         {signedIn === true && (
           <>
             {username && <p className="github-signed-in-as">Signed in as <strong>{username}</strong></p>}
+
+            {purpose === "signin" && (
+              <div className="modal-actions">
+                <button className="primary-btn" onClick={() => onSignedIn?.()}>
+                  Done
+                </button>
+              </div>
+            )}
 
             {purpose === "push" && (
               <>

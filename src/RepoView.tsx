@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type {
   BranchInfo,
@@ -70,9 +70,32 @@ export default function RepoView({ repoPath }: Props) {
   const [addRemoteOpen, setAddRemoteOpen] = useState(false);
   const [noRemoteChoiceOpen, setNoRemoteChoiceOpen] = useState(false);
   const [githubPushOpen, setGithubPushOpen] = useState(false);
+  const [needsGithubAuthOpen, setNeedsGithubAuthOpen] = useState(false);
+  const pendingGithubRetryRef = useRef<(() => void) | null>(null);
 
   const [commitSearch, setCommitSearch] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
+
+  // Wraps a fetch/pull/push action so that if it fails specifically because
+  // no GitHub auth is available for an otherwise-recoverable SSH remote (see
+  // git.rs's NEEDS_GITHUB_AUTH sentinel), the sign-in flow opens right here
+  // instead of just showing a dead-end error — and the same action is
+  // retried automatically once sign-in completes.
+  function withGithubAuthRetry(action: () => Promise<void>) {
+    return () =>
+      runAction(async () => {
+        try {
+          await action();
+        } catch (e) {
+          if (String(e).includes("NEEDS_GITHUB_AUTH")) {
+            pendingGithubRetryRef.current = () => runAction(action);
+            setNeedsGithubAuthOpen(true);
+            return;
+          }
+          throw e;
+        }
+      });
+  }
 
   function askConfirm(message: string, onConfirm: () => void, confirmLabel?: string) {
     setConfirmState({ message, onConfirm, confirmLabel });
@@ -264,12 +287,12 @@ export default function RepoView({ repoPath }: Props) {
           await refreshAll();
           setInfo("Refreshed");
         })}
-        onFetch={() => runAction(async () => {
+        onFetch={withGithubAuthRetry(async () => {
           await api.fetch(repoPath);
           await refreshAll();
           setInfo("Fetched");
         })}
-        onPull={() => runAction(async () => {
+        onPull={withGithubAuthRetry(async () => {
           const msg = await api.pull(repoPath);
           await refreshAll();
           setInfo(msg);
@@ -279,13 +302,13 @@ export default function RepoView({ repoPath }: Props) {
             setNoRemoteChoiceOpen(true);
             return;
           }
-          runAction(async () => {
+          withGithubAuthRetry(async () => {
             if (!status?.branch) throw new Error("No current branch");
             const b = branches.find((br) => !br.is_remote && br.name === status.branch);
             await api.push(repoPath, "origin", status.branch, !b?.upstream);
             await refreshAll();
             setInfo("Pushed");
-          });
+          })();
         }}
         onStash={() => setModal("stash")}
         onNewBranch={() => setModal("branch")}
@@ -738,6 +761,29 @@ export default function RepoView({ repoPath }: Props) {
           }}
           onError={(msg) => {
             setGithubPushOpen(false);
+            setError(msg);
+          }}
+        />
+      )}
+
+      {needsGithubAuthOpen && (
+        <GitHubModal
+          purpose="signin"
+          onCancel={() => {
+            setNeedsGithubAuthOpen(false);
+            pendingGithubRetryRef.current = null;
+          }}
+          onRepoReady={() => {}}
+          onCloned={() => {}}
+          onSignedIn={() => {
+            setNeedsGithubAuthOpen(false);
+            const retry = pendingGithubRetryRef.current;
+            pendingGithubRetryRef.current = null;
+            retry?.();
+          }}
+          onError={(msg) => {
+            setNeedsGithubAuthOpen(false);
+            pendingGithubRetryRef.current = null;
             setError(msg);
           }}
         />

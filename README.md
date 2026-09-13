@@ -184,6 +184,10 @@ with Windows-native tooling (WiX or NSIS) — not attempted yet from this Linux 
 The produced `.exe` has not been run on an actual Windows machine — cross-compiling only verifies
 it builds and links correctly, not that it behaves correctly at runtime.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for what's changed in each version.
+
 ## License
 
 [GNU AGPLv3](LICENSE), with the [Commons Clause](https://commonsclause.com/) condition. In short:

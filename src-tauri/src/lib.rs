@@ -3,6 +3,16 @@ mod github;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Without this, a stalled network connection (e.g. SSH's port 22 being
+    // silently dropped by a firewall/sandbox instead of refused) leaves any
+    // push/fetch/pull hanging on the OS's own TCP timeout — often a minute or
+    // more — during which the whole window appears frozen. Capping it here
+    // makes that fail fast with a clear error instead.
+    unsafe {
+        let _ = git2::opts::set_server_connect_timeout_in_milliseconds(10_000);
+        let _ = git2::opts::set_server_timeout_in_milliseconds(30_000);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
