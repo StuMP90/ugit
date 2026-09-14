@@ -4880,7 +4880,7 @@ dependencies = [
 
 [[package]]
 name = "ugit"
-version = "0.1.9"
+version = "0.1.11"
 dependencies = [
  "git2",
  "keyring",

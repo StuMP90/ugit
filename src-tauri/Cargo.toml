@@ -1,6 +1,6 @@
 [package]
 name = "ugit"
-version = "0.1.9"
+version = "0.1.11"
 description = "uGit - an interactive git client"
 authors = ["Stuart Millington"]
 edition = "2021"

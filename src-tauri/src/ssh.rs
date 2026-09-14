@@ -118,6 +118,41 @@ pub struct GeneratedKey {
     pub public_key: String,
 }
 
+/// Restricts a private key file's NTFS ACL to just the current user,
+/// mirroring `chmod 600` for Windows' OpenSSH client (which checks ACLs,
+/// not permission bits, and rejects a key anyone else can read).
+#[cfg(windows)]
+fn restrict_windows_key_permissions(path: &std::path::Path) -> Result<(), String> {
+    let user = std::env::var("USERNAME").map_err(|_| "USERNAME environment variable not set".to_string())?;
+    let path_str = path.to_string_lossy();
+
+    // Drop inherited ACEs from the containing folder first — otherwise the
+    // /grant below only adds to an already-too-open ACL instead of
+    // replacing it.
+    let inherit = Command::new("icacls")
+        .args([path_str.as_ref(), "/inheritance:r"])
+        .output()
+        .map_err(|e| format!("Couldn't run icacls to secure the new key ({e})"))?;
+    if !inherit.status.success() {
+        return Err(format!(
+            "icacls /inheritance:r failed: {}",
+            String::from_utf8_lossy(&inherit.stderr)
+        ));
+    }
+
+    let grant = Command::new("icacls")
+        .args([path_str.as_ref(), "/grant:r", &format!("{user}:(R)")])
+        .output()
+        .map_err(|e| format!("Couldn't run icacls to secure the new key ({e})"))?;
+    if !grant.status.success() {
+        return Err(format!(
+            "icacls /grant failed: {}",
+            String::from_utf8_lossy(&grant.stderr)
+        ));
+    }
+    Ok(())
+}
+
 /// Generates a new Ed25519 keypair (pure Rust — no dependency on an
 /// external `ssh-keygen` binary, which isn't guaranteed to be on PATH,
 /// especially on Windows), saves it under a name that can never collide
@@ -149,6 +184,20 @@ pub fn ssh_generate_key(app: tauri::AppHandle) -> Result<GeneratedKey, String> {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&priv_path, fs::Permissions::from_mode(0o600))
             .map_err(|e| e.to_string())?;
+    }
+    #[cfg(windows)]
+    {
+        // Windows' OpenSSH client checks the file's NTFS ACL, not Unix-style
+        // permission bits — it refuses to use a private key that's
+        // accessible to anyone but the owner ("Permissions ... are too
+        // open. This private key will be ignored."). A freshly written file
+        // otherwise just inherits the containing folder's ACL, which is
+        // usually too open. Strip inherited entries and grant only the
+        // current user access — the same fix Microsoft's own OpenSSH-for-
+        // Windows docs recommend (`icacls` is a built-in Windows tool, not
+        // an optional feature, so this doesn't add a new dependency risk
+        // the way relying on `ssh.exe` itself does).
+        restrict_windows_key_permissions(&priv_path)?;
     }
 
     let mut public_key = key.public_key().clone();

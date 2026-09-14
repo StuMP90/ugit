@@ -18,12 +18,13 @@ already installed and covers using the app itself.
 7. [Resetting a branch](#resetting-a-branch)
 8. [Stashing](#stashing)
 9. [Remotes: fetch, pull, push](#remotes-fetch-pull-push)
-10. [GitHub integration](#github-integration)
-11. [Working with multiple repositories](#working-with-multiple-repositories)
-12. [Searching commit history](#searching-commit-history)
-13. [Session memory](#session-memory)
-14. [Built-in help](#built-in-help)
-15. [Troubleshooting](#troubleshooting)
+10. [SSH key management](#ssh-key-management)
+11. [GitHub integration](#github-integration)
+12. [Working with multiple repositories](#working-with-multiple-repositories)
+13. [Searching commit history](#searching-commit-history)
+14. [Session memory](#session-memory)
+15. [Built-in help](#built-in-help)
+16. [Troubleshooting](#troubleshooting)
 
 ## Getting started
 
@@ -177,6 +178,56 @@ actual configured remote (checked via `git remote -v` or another tool, it will l
 so other tools reading the same repository are unaffected.
 
 To add a new remote, use the **+** control under **Remotes** in the sidebar.
+
+## SSH key management
+
+Click the **?** in the top-right corner, then **Set up an SSH key for GitHub → Manage SSH
+keys…** to open the SSH keys panel. It shows which of uGit's default-searched key names
+(`id_ed25519`, `id_rsa`, `id_ecdsa`) already exist in `~/.ssh`, plus any custom key you've
+configured.
+
+- **Generate new key** — creates a new Ed25519 keypair (pure Rust, no dependency on an external
+  `ssh-keygen` binary) under a name that can never collide with an existing key, and sets it as
+  the active key immediately. Shows the public key ready to copy, plus a button straight to
+  GitHub's "Add new SSH key" page. Only the public key ever leaves the app — you paste it into
+  GitHub yourself, so this never needs any elevated GitHub permission.
+- **Use existing key…** — point uGit at any private key file via a file picker (opens directly
+  inside `~/.ssh`, since native pickers hide dot-folders by default), overriding the default
+  filename search.
+- **Test connection** — checks SSH auth against GitHub via the system `ssh` binary
+  (`ssh -T git@github.com`), a completely separate process from anything OAuth-related, so a
+  signed-in GitHub account can never mask a real SSH problem here. Tests your configured custom
+  key specifically if one is set; otherwise lets `ssh` resolve normally (agent, config, default
+  files). Shows GitHub's own response text directly.
+
+### Securing SSH keys on Windows
+
+Windows' OpenSSH client checks a private key file's NTFS permissions, not Unix-style permission
+bits — if anyone other than you (SYSTEM/Administrators are exempted) can read it, it's silently
+rejected with something like *"Permissions ... are too open. This private key will be ignored."*
+A key just written to disk usually inherits its folder's permissions, which are typically too
+open, so this can affect a key you created manually, copied from another machine, or generated
+with a uGit version older than 0.1.10 (from 0.1.10 on, uGit fixes this automatically for keys it
+generates).
+
+**PowerShell** — replace the path with your key's:
+
+```powershell
+icacls "C:\path\to\your\key" /inheritance:r
+icacls "C:\path\to\your\key" /grant:r "$($env:USERNAME):(R)"
+```
+
+The first command strips inherited permissions (usually the source of the problem); the second
+grants read access to just your own account. Target the private key file itself (no `.pub`
+extension) — the public key's permissions don't matter.
+
+**Or, using File Explorer:** right-click the key file → **Properties** → **Security** tab →
+**Advanced** → **Disable inheritance** → "Remove all inherited permissions from this object" →
+then add an entry granting only your own user account Read access.
+
+**To verify it worked:** point **Manage SSH keys… → Use existing key…** at the file, then click
+**Test connection** — or run `ssh -T git@github.com -i "C:\path\to\your\key"` directly. If it's
+still rejected, the error names the exact problem.
 
 ## GitHub integration
 

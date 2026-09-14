@@ -36,6 +36,21 @@
     font-size: 0.9em;
     color: #f0c46a;
   }
+  pre {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    margin: 1em 0;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--text);
+    font-size: 0.85em;
+  }
   img {
     max-width: 100%;
     border-radius: 8px;
@@ -205,6 +220,7 @@
 <li><a href="#resetting-a-branch">Resetting a branch</a></li>
 <li><a href="#stashing">Stashing</a></li>
 <li><a href="#remotes-fetch-pull-push">Remotes: fetch, pull, push</a></li>
+<li><a href="#ssh-key-management">SSH key management</a></li>
 <li><a href="#github-integration">GitHub integration</a></li>
 <li><a href="#working-with-multiple-repositories">Working with multiple repositories</a></li>
 <li><a href="#searching-commit-history">Searching commit history</a></li>
@@ -350,6 +366,47 @@ uGit automatically retries the same operation over HTTPS using a signed-in GitHu
 actual configured remote (checked via <code>git remote -v</code> or another tool, it will look untouched),
 so other tools reading the same repository are unaffected.</p>
 <p>To add a new remote, use the <strong>+</strong> control under <strong>Remotes</strong> in the sidebar.</p>
+<h2 id="ssh-key-management">SSH key management</h2>
+<p>Click the <strong>?</strong> in the top-right corner, then <strong>Set up an SSH key for GitHub → Manage SSH
+keys…</strong> to open the SSH keys panel. It shows which of uGit's default-searched key names
+(<code>id_ed25519</code>, <code>id_rsa</code>, <code>id_ecdsa</code>) already exist in <code>~/.ssh</code>, plus any custom key you've
+configured.</p>
+<ul>
+<li><strong>Generate new key</strong> — creates a new Ed25519 keypair (pure Rust, no dependency on an external
+  <code>ssh-keygen</code> binary) under a name that can never collide with an existing key, and sets it as
+  the active key immediately. Shows the public key ready to copy, plus a button straight to
+  GitHub's "Add new SSH key" page. Only the public key ever leaves the app — you paste it into
+  GitHub yourself, so this never needs any elevated GitHub permission.</li>
+<li><strong>Use existing key…</strong> — point uGit at any private key file via a file picker (opens directly
+  inside <code>~/.ssh</code>, since native pickers hide dot-folders by default), overriding the default
+  filename search.</li>
+<li><strong>Test connection</strong> — checks SSH auth against GitHub via the system <code>ssh</code> binary
+  (<code>ssh -T git@github.com</code>), a completely separate process from anything OAuth-related, so a
+  signed-in GitHub account can never mask a real SSH problem here. Tests your configured custom
+  key specifically if one is set; otherwise lets <code>ssh</code> resolve normally (agent, config, default
+  files). Shows GitHub's own response text directly.</li>
+</ul>
+<h3 id="securing-ssh-keys-on-windows">Securing SSH keys on Windows</h3>
+<p>Windows' OpenSSH client checks a private key file's NTFS permissions, not Unix-style permission
+bits — if anyone other than you (SYSTEM/Administrators are exempted) can read it, it's silently
+rejected with something like <em>"Permissions ... are too open. This private key will be ignored."</em>
+A key just written to disk usually inherits its folder's permissions, which are typically too
+open, so this can affect a key you created manually, copied from another machine, or generated
+with a uGit version older than 0.1.10 (from 0.1.10 on, uGit fixes this automatically for keys it
+generates).</p>
+<p><strong>PowerShell</strong> — replace the path with your key's:</p>
+<pre><code class="language-powershell">icacls &quot;C:\path\to\your\key&quot; /inheritance:r
+icacls &quot;C:\path\to\your\key&quot; /grant:r &quot;$($env:USERNAME):(R)&quot;
+</code></pre>
+<p>The first command strips inherited permissions (usually the source of the problem); the second
+grants read access to just your own account. Target the private key file itself (no <code>.pub</code>
+extension) — the public key's permissions don't matter.</p>
+<p><strong>Or, using File Explorer:</strong> right-click the key file → <strong>Properties</strong> → <strong>Security</strong> tab →
+<strong>Advanced</strong> → <strong>Disable inheritance</strong> → "Remove all inherited permissions from this object" →
+then add an entry granting only your own user account Read access.</p>
+<p><strong>To verify it worked:</strong> point <strong>Manage SSH keys… → Use existing key…</strong> at the file, then click
+<strong>Test connection</strong> — or run <code>ssh -T git@github.com -i "C:\path\to\your\key"</code> directly. If it's
+still rejected, the error names the exact problem.</p>
 <h2 id="github-integration">GitHub integration</h2>
 <p>uGit can sign in to GitHub using its <strong>Device Flow</strong> — no password is ever typed into uGit, and
 the resulting token is stored in your OS's secure keychain (Secret Service on Linux, Credential

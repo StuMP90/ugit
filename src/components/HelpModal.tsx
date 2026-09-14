@@ -35,6 +35,49 @@ function sshKeysTopic(onManage: () => void): Topic {
 
 const TOPICS: Topic[] = [
   {
+    id: "securing-ssh-keys-windows",
+    title: "Securing SSH keys on Windows",
+    body: (
+      <>
+        <p>
+          Windows' OpenSSH client checks a private key file's NTFS permissions, not Unix-style
+          permission bits — if anyone other than you (SYSTEM/Administrators are exempted) can
+          read it, it's silently rejected with something like{" "}
+          <em>"Permissions ... are too open. This private key will be ignored."</em> A key just
+          written to disk usually inherits its folder's permissions, which are typically too
+          open, so this can affect a key you created manually, copied from another machine, or
+          generated with a uGit version older than 0.1.10 (from 0.1.10 on, uGit fixes this
+          automatically for keys it generates).
+        </p>
+        <p>
+          <strong>PowerShell</strong> — replace the path with your key's:
+        </p>
+        <pre>{`icacls "C:\\path\\to\\your\\key" /inheritance:r
+icacls "C:\\path\\to\\your\\key" /grant:r "$($env:USERNAME):(R)"`}</pre>
+        <p>
+          The first command strips inherited permissions (usually the source of the problem); the
+          second grants read access to just your own account. Target the private key file itself
+          (no <code>.pub</code> extension) — the public key's permissions don't matter.
+        </p>
+        <p>
+          <strong>Or, using File Explorer:</strong>
+        </p>
+        <p>
+          Right-click the key file → <strong>Properties</strong> → <strong>Security</strong> tab
+          → <strong>Advanced</strong> → <strong>Disable inheritance</strong> → "Remove all
+          inherited permissions from this object" → then add an entry granting only your own user
+          account Read access.
+        </p>
+        <p>
+          <strong>To verify it worked:</strong> point <strong>Manage SSH keys… → Use existing
+          key…</strong> at the file, then click <strong>Test connection</strong> — or run{" "}
+          <code>ssh -T git@github.com -i "C:\path\to\your\key"</code> directly. If it's still
+          rejected, the error names the exact problem.
+        </p>
+      </>
+    ),
+  },
+  {
     id: "ssh-aliases",
     title: "Using multiple accounts (e.g. personal + work GitHub)",
     body: (
