@@ -2,9 +2,9 @@
 
 ![uGit — A visual Git client](assets/cover.png)
 
-An interactive, GitKraken-style desktop git client for Linux and Windows, built with Tauri
+An interactive, desktop git client for Linux and Windows, built with Tauri
 (Rust + `git2`) and React. It's aimed at everyday git workflows — browsing history, staging and
-committing, branching, merging, and resolving conflicts — without leaving a GUI.
+committing, branching, merging, and resolving conflicts — without leaving the GUI.
 
 ## Screenshots
 
