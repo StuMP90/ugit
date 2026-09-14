@@ -3,6 +3,46 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.9] - 2026-09-14
+
+### Added
+- **"Test connection" in the SSH keys panel** — checks SSH auth against
+  GitHub directly via the system `ssh` binary (`ssh -T git@github.com`),
+  a completely separate process from anything OAuth/HTTPS-related, so a
+  signed-in GitHub account can never mask a real SSH problem by making the
+  test succeed some other way. Tests the configured custom key specifically
+  if one is set (bypassing agent/`~/.ssh/config` so the result reflects
+  exactly the file uGit itself would use), or lets `ssh` resolve normally
+  otherwise. Shows GitHub's own response text directly (e.g. "Hi
+  &lt;username&gt;! You've successfully authenticated…" or "Permission
+  denied (publickey).").
+
+## [0.1.8] - 2026-09-14
+
+### Fixed
+- "Use existing key…" (added in 0.1.7) opened the file picker at its
+  default starting location, not `~/.ssh` — and since `~/.ssh` is a
+  dot-folder, native file pickers hide it by default, forcing the user to
+  reveal hidden folders themselves before they could even get there. The
+  picker now opens directly inside `~/.ssh`.
+
+## [0.1.7] - 2026-09-14
+
+### Added
+- **SSH key management**, from a new "Set up an SSH key for GitHub" topic in
+  the Help panel:
+  - **Generate a new key** — a pure-Rust Ed25519 keypair (no dependency on
+    an external `ssh-keygen` binary), saved under a name that can never
+    collide with an existing key. Shows the public key ready to copy, plus
+    a button straight to GitHub's "Add new SSH key" page — uGit never
+    talks to the GitHub API to add it for you, so no extra OAuth
+    permission is needed; you paste it in yourself.
+  - **Use an existing key** — point uGit at any private key file via a
+    file picker, overriding the default `~/.ssh` filename search.
+  - The same panel shows which of uGit's default-searched key names
+    (`id_ed25519`, `id_rsa`, `id_ecdsa`) already exist, so the whole SSH
+    auth picture is visible in one place instead of implicit.
+
 ## [0.1.6] - 2026-09-14
 
 ### Fixed

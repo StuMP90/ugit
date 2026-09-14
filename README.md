@@ -48,8 +48,14 @@ committing, branching, merging, and resolving conflicts — without leaving the 
   window's size and position.
 - **Built-in help** — a Help panel covering things a GUI client would otherwise leave you to figure
   out yourself: setting up SSH, creating a new local repo, linking a local repo to an existing
-  remote, and creating a new remote from a local one — the last two are also real buttons, not just
+  remote, and creating a new remote from a local one — these are also real buttons, not just
   instructions.
+- **SSH key management** — generate a new Ed25519 keypair (pure Rust, no dependency on an external
+  `ssh-keygen`) or point uGit at an existing private key file, right from the Help panel. Either
+  way, only the public key ever leaves the app — you copy/paste it into GitHub yourself, so uGit
+  never needs any elevated GitHub permission to manage your keys for you. A **Test connection**
+  button checks SSH auth via a separate process from anything OAuth-related, so a signed-in
+  GitHub account can never mask a real SSH problem.
 
 ## Development
 
@@ -220,8 +226,12 @@ bootstrap WebView2 automatically for older systems is possible later via Tauri's
 `bundle.windows.webviewInstallMode` config, but needs the build to run through Tauri's own bundler
 with Windows-native tooling (WiX or NSIS) — not attempted yet from this Linux setup.
 
-The produced `.exe` has not been run on an actual Windows machine — cross-compiling only verifies
-it builds and links correctly, not that it behaves correctly at runtime.
+The SSH panel's **Test connection** button shells out to the system `ssh` binary
+(`C:\Windows\System32\OpenSSH\ssh.exe`), which is an optional Windows feature — present by default
+on most Windows 11 and recent Windows 10 installs, but not guaranteed. If it's missing, only that
+one button is affected (a clear error is shown); everything else works regardless.
+
+Verified running on an actual Windows 11 machine (not just cross-compiled and assumed to work).
 
 ## User manual
 

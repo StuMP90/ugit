@@ -1,5 +1,6 @@
 mod git;
 mod github;
+mod ssh;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -63,6 +64,11 @@ pub fn run() {
             github::github_get_username,
             github::github_list_repos,
             github::github_create_repo,
+            ssh::ssh_status,
+            ssh::ssh_set_custom_key,
+            ssh::ssh_clear_custom_key,
+            ssh::ssh_generate_key,
+            ssh::ssh_test_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

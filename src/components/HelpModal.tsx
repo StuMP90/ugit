@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import SshKeyModal from "./SshKeyModal";
 
 const REPO_URL = "https://github.com/StuMP90/ugit";
 
@@ -8,6 +9,28 @@ interface Topic {
   id: string;
   title: string;
   body: React.ReactNode;
+}
+
+function sshKeysTopic(onManage: () => void): Topic {
+  return {
+    id: "ssh-keys",
+    title: "Set up an SSH key for GitHub",
+    body: (
+      <>
+        <p>
+          If you don't already have SSH set up with GitHub, uGit can generate a new key for you
+          (or use one you already have) — click <strong>Manage SSH keys…</strong> below. Either
+          way, the private key never leaves this machine; only the public half gets pasted into
+          GitHub.
+        </p>
+        <div className="modal-actions">
+          <button className="toolbar-btn" onClick={onManage}>
+            Manage SSH keys…
+          </button>
+        </div>
+      </>
+    ),
+  };
 }
 
 const TOPICS: Topic[] = [
@@ -117,8 +140,9 @@ interface Props {
 }
 
 export default function HelpModal({ onClose }: Props) {
-  const [openId, setOpenId] = useState<string>(TOPICS[0].id);
+  const [openId, setOpenId] = useState<string>("ssh-keys");
   const [version, setVersion] = useState<string | null>(null);
+  const [sshModalOpen, setSshModalOpen] = useState(false);
 
   useEffect(() => {
     getVersion()
@@ -126,40 +150,45 @@ export default function HelpModal({ onClose }: Props) {
       .catch(() => {});
   }, []);
 
+  const topics = [sshKeysTopic(() => setSshModalOpen(true)), ...TOPICS];
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal help-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="help-modal-header">
-          <h3>Help</h3>
-          <button className="icon-btn" onClick={onClose} title="Close">
-            ✕
-          </button>
-        </div>
-        <div className="help-modal-body">
-          {TOPICS.map((topic) => {
-            const isOpen = topic.id === openId;
-            return (
-              <div className="help-topic" key={topic.id}>
-                <div
-                  className="help-topic-header"
-                  onClick={() => setOpenId(isOpen ? "" : topic.id)}
-                >
-                  <span className="sidebar-caret">{isOpen ? "▾" : "▸"}</span>
-                  <span>{topic.title}</span>
+    <>
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal help-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="help-modal-header">
+            <h3>Help</h3>
+            <button className="icon-btn" onClick={onClose} title="Close">
+              ✕
+            </button>
+          </div>
+          <div className="help-modal-body">
+            {topics.map((topic) => {
+              const isOpen = topic.id === openId;
+              return (
+                <div className="help-topic" key={topic.id}>
+                  <div
+                    className="help-topic-header"
+                    onClick={() => setOpenId(isOpen ? "" : topic.id)}
+                  >
+                    <span className="sidebar-caret">{isOpen ? "▾" : "▸"}</span>
+                    <span>{topic.title}</span>
+                  </div>
+                  {isOpen && <div className="help-topic-body">{topic.body}</div>}
                 </div>
-                {isOpen && <div className="help-topic-body">{topic.body}</div>}
-              </div>
-            );
-          })}
-        </div>
-        <div className="help-modal-footer">
-          <span>{version ? `uGit v${version}` : "uGit"}</span>
-          <span className="help-modal-footer-sep">·</span>
-          <button className="link-btn" onClick={() => openUrl(REPO_URL).catch(() => {})}>
-            GitHub: StuMP90/ugit
-          </button>
+              );
+            })}
+          </div>
+          <div className="help-modal-footer">
+            <span>{version ? `uGit v${version}` : "uGit"}</span>
+            <span className="help-modal-footer-sep">·</span>
+            <button className="link-btn" onClick={() => openUrl(REPO_URL).catch(() => {})}>
+              GitHub: StuMP90/ugit
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+      {sshModalOpen && <SshKeyModal onClose={() => setSshModalOpen(false)} />}
+    </>
   );
 }

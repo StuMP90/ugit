@@ -1070,6 +1070,55 @@ button {
   color: var(--success);
 }
 
+/* ---------- SSH key modal ---------- */
+
+.ssh-modal {
+  width: 440px;
+  max-width: 90vw;
+}
+.ssh-key-list {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.ssh-key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ssh-key-row:last-child {
+  border-bottom: none;
+}
+.ssh-key-badge {
+  font-size: 10px;
+  border-radius: 8px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  background: var(--bg-3);
+  color: var(--text-2);
+}
+.ssh-key-badge.found {
+  background: #1f3a2b;
+  color: var(--success);
+}
+.ssh-pubkey-box {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-0);
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 11px;
+  padding: 10px;
+  word-break: break-all;
+  box-sizing: border-box;
+}
+
 /* ---------- Help modal ---------- */
 
 .help-modal {

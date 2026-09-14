@@ -5,6 +5,7 @@ import type {
   DeviceCodeInfo,
   DevicePollResult,
   FileDiff,
+  GeneratedKey,
   GithubRepo,
   MergeOutcome,
   RebaseProgress,
@@ -12,6 +13,8 @@ import type {
   RepoState,
   RepoStatus,
   RepoSummary,
+  SshStatus,
+  SshTestResult,
   StashInfo,
   TagInfo,
 } from "./types";
@@ -142,4 +145,14 @@ export const api = {
 
   githubCreateRepo: (name: string, private_: boolean, description: string | null) =>
     invoke<GithubRepo>("github_create_repo", { name, private: private_, description }),
+
+  sshStatus: () => invoke<SshStatus>("ssh_status"),
+
+  sshSetCustomKey: (path: string) => invoke<void>("ssh_set_custom_key", { path }),
+
+  sshClearCustomKey: () => invoke<void>("ssh_clear_custom_key"),
+
+  sshGenerateKey: () => invoke<GeneratedKey>("ssh_generate_key"),
+
+  sshTestConnection: () => invoke<SshTestResult>("ssh_test_connection"),
 };

@@ -124,3 +124,27 @@ export interface GithubRepo {
   ssh_url: string;
   updated_at: string;
 }
+
+export interface DetectedKey {
+  name: string;
+  path: string;
+  exists: boolean;
+}
+
+export interface SshStatus {
+  default_keys: DetectedKey[];
+  custom_key_path: string | null;
+  custom_key_exists: boolean;
+  ssh_dir: string;
+}
+
+export interface GeneratedKey {
+  private_key_path: string;
+  public_key: string;
+}
+
+export interface SshTestResult {
+  success: boolean;
+  message: string;
+  tested_key: string | null;
+}
