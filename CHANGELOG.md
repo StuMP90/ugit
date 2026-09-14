@@ -3,6 +3,29 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.6] - 2026-09-14
+
+### Fixed
+- **GitHub sign-in could stop working overnight with a raw `status code 401`**
+  on "Clone from GitHub…" and repo browsing. GitHub's Device Flow can issue
+  *expiring* access tokens (8h, with a ~6-month refresh token) if this
+  OAuth App's token expiration is enabled — either by its own settings or
+  an organization's policy — and uGit was silently discarding the
+  `refresh_token`/`expires_in` fields GitHub sends in that case, with no
+  way to renew. Fetch/Pull/Push already had a graceful re-auth prompt for
+  this; the GitHub REST API calls (list/create repos, get username) didn't.
+
+### Added
+- **Automatic token refresh.** uGit now stores the refresh token (if
+  GitHub issues one) alongside the access token, and transparently
+  exchanges it for a new access token shortly before the old one expires —
+  no re-sign-in needed for as long as the refresh token itself stays valid.
+  If refreshing isn't possible (no refresh token, it's expired, or GitHub's
+  refresh flow turns out to require a client secret — uGit deliberately
+  never embeds one in the distributed binary), or a stored token is
+  rejected outright (401), uGit now clears it and prompts sign-in again
+  cleanly instead of surfacing a raw error.
+
 ## [0.1.5] - 2026-09-13
 
 ### Fixed

@@ -7,6 +7,12 @@ import { getLastDir, rememberDir } from "../lastDir";
 
 type Purpose = "push" | "clone" | "signin";
 
+// Backend's github.rs NEEDS_GITHUB_AUTH sentinel: the stored token turned
+// out to be unusable (expired, revoked) rather than an ordinary API error.
+function isAuthSentinel(e: unknown) {
+  return String(e).includes("NEEDS_GITHUB_AUTH");
+}
+
 interface Props {
   purpose: Purpose;
   suggestedName?: string;
@@ -56,8 +62,12 @@ export default function GitHubModal({
         try {
           const u = await api.githubGetUsername();
           if (!cancelledRef.current) setUsername(u);
-        } catch {
-          // ignore — will just show as signed in without a username
+        } catch (e) {
+          // A stored token that turns out to be dead (expired with no usable
+          // refresh token, revoked, etc.) surfaces here as NEEDS_GITHUB_AUTH —
+          // fall back to the sign-in screen instead of showing "signed in"
+          // with no username and every action failing.
+          if (!cancelledRef.current && isAuthSentinel(e)) setSignedIn(false);
         }
       }
     });
@@ -70,7 +80,15 @@ export default function GitHubModal({
       api
         .githubListRepos()
         .then((r) => !cancelledRef.current && setRepos(r))
-        .catch((e) => onError(String(e)))
+        .catch((e) => {
+          if (cancelledRef.current) return;
+          if (isAuthSentinel(e)) {
+            setSignedIn(false);
+            setUsername(null);
+          } else {
+            onError(String(e));
+          }
+        })
         .finally(() => !cancelledRef.current && setBusy(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,7 +147,12 @@ export default function GitHubModal({
       const repo = await api.githubCreateRepo(repoName.trim(), isPrivate, description.trim() || null);
       onRepoReady(repo);
     } catch (e) {
-      onError(String(e));
+      if (isAuthSentinel(e)) {
+        setSignedIn(false);
+        setUsername(null);
+      } else {
+        onError(String(e));
+      }
       setBusy(false);
     }
   }
