@@ -3,6 +3,14 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.0.0] - 2026-09-14
+
+Version bump only — no functional changes since 0.1.11. Marks uGit as feature-complete for its
+initial goals: full everyday git workflow (staging, branching, merging with a real 3-way conflict
+tool, stashing, resetting), GitHub integration (Device Flow sign-in with automatic token refresh,
+repo browsing/creation, SSH key management with connection testing), multi-repo tabs, session
+memory, and packaging for both Linux and Windows.
+
 ## [0.1.11] - 2026-09-14
 
 ### Added
