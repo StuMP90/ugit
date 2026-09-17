@@ -6,6 +6,14 @@ An interactive, desktop git client for Linux and Windows, built with Tauri
 (Rust + `git2`) and React. It's aimed at everyday git workflows — browsing history, staging and
 committing, branching, merging, and resolving conflicts — without leaving the GUI.
 
+## Download
+
+Pre-built binaries for Linux (`.deb`/`.rpm`/`.AppImage`) and Windows (`.exe`) are available at
+**[z-add.co.uk/blogs/ugit-a-visual-git-client-for-linux-and-windows](https://www.z-add.co.uk/blogs/ugit-a-visual-git-client-for-linux-and-windows)**,
+along with checksums to verify each download. Prefer to build it yourself instead? See
+[Development](#development) and [Building for Linux](#building-for-linux) /
+[Building for Windows](#building-for-windows-cross-compiled-from-linux) below.
+
 ## Screenshots
 
 | | |
