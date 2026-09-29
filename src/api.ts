@@ -6,6 +6,7 @@ import type {
   DevicePollResult,
   FileDiff,
   GeneratedKey,
+  GithubRelease,
   GithubRepo,
   MergeOutcome,
   RebaseProgress,
@@ -153,6 +154,23 @@ export const api = {
 
   githubCreateRepo: (name: string, private_: boolean, description: string | null) =>
     invoke<GithubRepo>("github_create_repo", { name, private: private_, description }),
+
+  githubCreateRelease: (
+    remoteUrl: string,
+    tagName: string,
+    name: string | null,
+    body: string | null,
+    draft: boolean,
+    prerelease: boolean
+  ) =>
+    invoke<GithubRelease>("github_create_release", {
+      remoteUrl,
+      tagName,
+      name,
+      body,
+      draft,
+      prerelease,
+    }),
 
   sshStatus: () => invoke<SshStatus>("ssh_status"),
 

@@ -395,3 +395,66 @@ pub fn github_ssh_to_https(url: &str) -> Option<String> {
     }
     Some(format!("https://github.com/{rest}"))
 }
+
+/// Extracts `(owner, repo)` from a `github.com` remote URL in any of the
+/// forms git normally produces (SSH scp-like, `ssh://`, or `https://`).
+/// Returns `None` for anything that isn't a github.com remote.
+fn parse_github_owner_repo(url: &str) -> Option<(String, String)> {
+    let rest = url
+        .strip_prefix("git@github.com:")
+        .or_else(|| url.strip_prefix("ssh://git@github.com/"))
+        .or_else(|| url.strip_prefix("https://github.com/"))
+        .or_else(|| url.strip_prefix("http://github.com/"))?;
+    let rest = rest.trim_end_matches('/').trim_end_matches(".git");
+    let (owner, repo) = rest.split_once('/')?;
+    if owner.is_empty() || repo.is_empty() {
+        return None;
+    }
+    Some((owner.to_string(), repo.to_string()))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GithubRelease {
+    pub html_url: String,
+    pub tag_name: String,
+}
+
+/// Creates a GitHub Release for an existing tag. A pushed git tag alone
+/// never shows up under a repo's "Releases" — GitHub treats a Release as a
+/// separate object wrapping a tag with its own title/notes, and creating
+/// one is always a deliberate, explicit action (this call), never an
+/// automatic side effect of pushing a tag.
+#[tauri::command]
+pub fn github_create_release(
+    remote_url: String,
+    tag_name: String,
+    name: Option<String>,
+    body: Option<String>,
+    draft: bool,
+    prerelease: bool,
+) -> Result<GithubRelease, String> {
+    let (owner, repo) =
+        parse_github_owner_repo(&remote_url).ok_or("Not a github.com remote")?;
+    let token = valid_access_token()?.ok_or(NEEDS_GITHUB_AUTH)?;
+
+    let mut payload = serde_json::Map::new();
+    payload.insert("tag_name".to_string(), serde_json::json!(tag_name));
+    if let Some(n) = name.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
+        payload.insert("name".to_string(), serde_json::json!(n));
+    }
+    if let Some(b) = body.as_deref().map(str::trim).filter(|b| !b.is_empty()) {
+        payload.insert("body".to_string(), serde_json::json!(b));
+    }
+    payload.insert("draft".to_string(), serde_json::json!(draft));
+    payload.insert("prerelease".to_string(), serde_json::json!(prerelease));
+
+    let release: GithubRelease = agent()
+        .post(&format!("https://api.github.com/repos/{owner}/{repo}/releases"))
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Accept", "application/vnd.github+json")
+        .send_json(serde_json::Value::Object(payload))
+        .map_err(map_api_error)?
+        .into_json()
+        .map_err(|e| e.to_string())?;
+    Ok(release)
+}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { api } from "./api";
 import type {
   BranchInfo,
@@ -22,6 +23,7 @@ import ConflictView from "./components/ConflictView";
 import MergeRebaseBanner from "./components/MergeRebaseBanner";
 import PromptModal from "./components/PromptModal";
 import CreateTagModal from "./components/CreateTagModal";
+import CreateReleaseModal from "./components/CreateReleaseModal";
 import ConfirmDialog from "./components/ConfirmDialog";
 import AddRemoteModal from "./components/AddRemoteModal";
 import GitHubModal from "./components/GitHubModal";
@@ -67,6 +69,7 @@ export default function RepoView({ repoPath }: Props) {
   const [busy, setBusy] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
+  const [releaseTag, setReleaseTag] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [addRemoteOpen, setAddRemoteOpen] = useState(false);
   const [noRemoteChoiceOpen, setNoRemoteChoiceOpen] = useState(false);
@@ -485,6 +488,7 @@ export default function RepoView({ repoPath }: Props) {
               "Delete tag"
             )
           }
+          onCreateRelease={(name) => setReleaseTag(name)}
         />
 
         <div className="graph-column">
@@ -709,6 +713,31 @@ export default function RepoView({ repoPath }: Props) {
                 setInfo(`Created tag "${name}"`);
               });
             }
+          }}
+        />
+      )}
+
+      {releaseTag && (
+        <CreateReleaseModal
+          tagName={releaseTag}
+          onCancel={() => setReleaseTag(null)}
+          onConfirm={(name, body, draft, prerelease) => {
+            const tag = releaseTag;
+            setReleaseTag(null);
+            withGithubAuthRetry(async () => {
+              const origin = remotes.find((r) => r.name === "origin");
+              if (!origin) throw new Error('No "origin" remote configured');
+              const release = await api.githubCreateRelease(
+                origin.url,
+                tag,
+                name || null,
+                body || null,
+                draft,
+                prerelease
+              );
+              setInfo(`Created release "${release.tag_name}"`);
+              openUrl(release.html_url).catch(() => {});
+            })();
           }}
         />
       )}

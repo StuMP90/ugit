@@ -957,12 +957,16 @@ button {
 .modal h3 {
   margin: 0;
 }
-.modal input {
+.modal input,
+.modal textarea {
   background: var(--bg-3);
   border: 1px solid var(--border);
   color: var(--text-0);
   padding: 8px;
   border-radius: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  resize: vertical;
 }
 .modal-actions {
   display: flex;

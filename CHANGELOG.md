@@ -3,6 +3,21 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.0] - 2026-09-29
+
+### Added
+- **Create GitHub Releases from an existing tag.** Pushing a git tag was
+  never enough on its own — GitHub treats a Release as a separate object
+  wrapping a tag with its own title/notes, and creating one is always a
+  deliberate action, not an automatic side effect of pushing a tag. Each
+  tag now gets a "Create GitHub release" button (only shown when `origin`
+  is actually a `github.com` remote) opening a small form for title,
+  notes, draft, and pre-release. Verified against real GitHub — the create
+  call, and the earlier 404-vs-401 distinction proving real auth was in
+  play — using a disposable test repo, cleaned up immediately after
+  (though its final `DELETE` needed the separate `delete_repo` OAuth scope
+  uGit doesn't request, so it was removed manually instead).
+
 ## [2.1.0] - 2026-09-29
 
 ### Added

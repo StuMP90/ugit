@@ -125,6 +125,11 @@ export interface GithubRepo {
   updated_at: string;
 }
 
+export interface GithubRelease {
+  html_url: string;
+  tag_name: string;
+}
+
 export interface DetectedKey {
   name: string;
   path: string;

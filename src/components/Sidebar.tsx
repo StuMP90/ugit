@@ -18,6 +18,7 @@ interface Props {
   onCreateTag: () => void;
   onPushTag: (name: string) => void;
   onDeleteTag: (name: string) => void;
+  onCreateRelease: (name: string) => void;
 }
 
 function Section({
@@ -63,9 +64,16 @@ export default function Sidebar({
   onCreateTag,
   onPushTag,
   onDeleteTag,
+  onCreateRelease,
 }: Props) {
   const local = branches.filter((b) => !b.is_remote);
   const remote = branches.filter((b) => b.is_remote);
+  // GitHub Releases are a GitHub-specific concept (not plain git) — only
+  // offer the action when origin actually points at github.com, rather
+  // than showing a button that would just fail for e.g. a GitLab remote.
+  const isGithubOrigin = remotes.some(
+    (r) => r.name === "origin" && /(^|@|\/)github\.com[:/]/.test(r.url)
+  );
 
   return (
     <div className="sidebar">
@@ -208,6 +216,18 @@ export default function Sidebar({
         {tags.map((t) => (
           <div key={t.name} className="sidebar-item">
             <span className="sidebar-item-label">{t.name}</span>
+            {isGithubOrigin && (
+              <button
+                className="icon-btn"
+                title={`Create a GitHub release from "${t.name}"`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateRelease(t.name);
+                }}
+              >
+                R
+              </button>
+            )}
             <button
               className="icon-btn"
               title={`Push tag "${t.name}" to origin`}
