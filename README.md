@@ -26,7 +26,9 @@ along with checksums to verify each download. Prefer to build it yourself instea
 ## Features
 
 - **Multiple repositories at once** — each open repo gets its own tab; switching tabs is instant
-  and never loses in-progress work (a draft commit message, a half-resolved merge, etc).
+  and never loses in-progress work (a draft commit message, a half-resolved merge, etc). A tab
+  left in the background for more than 15 minutes silently refreshes itself when you switch back
+  to it, so you're never looking at stale data without knowing it.
 - **Commit graph** — a colored, lane-based visualization of history across all branches, in the
   style of `git log --graph`. Click any commit to see its changed files and diffs.
 - **Commit search** — search by message, author, or branch/tag ref; shows a live match count with
@@ -42,7 +44,8 @@ along with checksums to verify each download. Prefer to build it yourself instea
 - **Branch reset** — soft/mixed/hard reset the current branch to any earlier commit.
 - **Tags** — create annotated or lightweight tags on the current commit, push them to a remote
   (immediately on creation, or later with one click), and delete them locally — everything a
-  release needs, without dropping to a shell.
+  release needs, without dropping to a shell. Listed most-recent-first, collapsed to the latest
+  10 with a one-click "show all" for repos with a longer tag history.
 - **Stashing** — save, apply, pop, and drop stashes.
 - **Remotes** — add remotes, and fetch/pull/push with SSH-agent, `~/.ssh` key, and git
   credential-helper authentication, tried in that order. If an SSH remote (e.g. one set up by

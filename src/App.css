@@ -436,6 +436,21 @@ button {
   text-overflow: ellipsis;
   flex: 1;
 }
+.sidebar-show-more {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px 5px 22px;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sidebar-show-more:hover {
+  color: var(--accent);
+  background: var(--bg-2);
+}
 .branch-ab {
   font-size: 10px;
   color: var(--text-2);

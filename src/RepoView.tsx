@@ -40,9 +40,12 @@ interface ConfirmState {
 
 interface Props {
   repoPath: string;
+  isActive: boolean;
 }
 
-export default function RepoView({ repoPath }: Props) {
+const STALE_REFRESH_MS = 15 * 60 * 1000;
+
+export default function RepoView({ repoPath, isActive }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -137,12 +140,27 @@ export default function RepoView({ repoPath }: Props) {
     setStashes(st);
     setRepoState(rs);
     setRemotes(rm);
+    lastRefreshedRef.current = Date.now();
   }, [repoPath]);
 
   useEffect(() => {
     runAction(refreshAll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]);
+
+  // A background tab can sit unattended for a long time — if you switch
+  // back to it after a while, silently refresh rather than showing
+  // possibly stale data. Initialized to "now" (not 0) so this doesn't
+  // double up with the unconditional mount refresh just above when a tab
+  // starts out active.
+  const lastRefreshedRef = useRef(Date.now());
+  useEffect(() => {
+    if (!isActive) return;
+    if (Date.now() - lastRefreshedRef.current > STALE_REFRESH_MS) {
+      runAction(refreshAll);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
 
   // Separate from refreshAll: this is best-effort, GitHub-only, and must
   // never block the rest of the UI on GitHub's API being reachable. On any

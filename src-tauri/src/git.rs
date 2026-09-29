@@ -176,6 +176,13 @@ pub struct StashInfo {
 pub struct TagInfo {
     pub name: String,
     pub target: String,
+    /// Unix timestamp of the target commit — the tag object's own creation
+    /// time for an annotated tag isn't used here, since a lightweight tag
+    /// has no such timestamp at all (it's just a ref); using the commit's
+    /// time instead gives every tag a consistent, always-available sort
+    /// key, and matches "which release point is newer" more intuitively
+    /// than "when was this tag administratively created" anyway.
+    pub time: i64,
 }
 
 // ---------- Helpers ----------
@@ -600,13 +607,20 @@ pub fn get_tags(repo_path: String) -> Result<Vec<TagInfo>, String> {
         let name = String::from_utf8_lossy(name)
             .trim_start_matches("refs/tags/")
             .to_string();
+        let time = repo
+            .find_object(oid, None)
+            .and_then(|obj| obj.peel_to_commit())
+            .map(|c| c.time().seconds())
+            .unwrap_or(0);
         out.push(TagInfo {
             name,
             target: oid.to_string(),
+            time,
         });
         true
     })
     .map_err(|e| e.to_string())?;
+    out.sort_by(|a, b| b.time.cmp(&a.time));
     Ok(out)
 }
 
@@ -1054,7 +1068,11 @@ pub fn create_tag(
             .tag_lightweight(&name, &target_obj, false)
             .map_err(|e| e.to_string())?,
     };
-    Ok(TagInfo { name, target: oid.to_string() })
+    let time = target_obj
+        .peel_to_commit()
+        .map(|c| c.time().seconds())
+        .unwrap_or(0);
+    Ok(TagInfo { name, target: oid.to_string(), time })
 }
 
 #[tauri::command]

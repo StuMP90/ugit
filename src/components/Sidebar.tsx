@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { BranchInfo, GithubRelease, RemoteInfo, StashInfo, TagInfo } from "../types";
 import { isGithubRemoteUrl } from "../githubUtils";
 
+const TAGS_COLLAPSE_THRESHOLD = 10;
+
 interface Props {
   branches: BranchInfo[];
   tags: TagInfo[];
@@ -80,6 +82,10 @@ export default function Sidebar({
     (r) => r.name === "origin" && isGithubRemoteUrl(r.url)
   );
   const releaseByTag = new Map(releases.map((r) => [r.tag_name, r]));
+  // Backend already returns tags most-recent-first (by target commit time)
+  // — just slice for display here.
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const visibleTags = tagsExpanded ? tags : tags.slice(0, TAGS_COLLAPSE_THRESHOLD);
 
   return (
     <div className="sidebar">
@@ -219,7 +225,7 @@ export default function Sidebar({
           </button>
         }
       >
-        {tags.map((t) => {
+        {visibleTags.map((t) => {
           const release = releaseByTag.get(t.name);
           return (
           <div key={t.name} className="sidebar-item">
@@ -272,6 +278,11 @@ export default function Sidebar({
           </div>
           );
         })}
+        {tags.length > TAGS_COLLAPSE_THRESHOLD && (
+          <button className="sidebar-show-more" onClick={() => setTagsExpanded((e) => !e)}>
+            {tagsExpanded ? "Show fewer" : `Show all ${tags.length} tags…`}
+          </button>
+        )}
       </Section>
 
       <Section title="Stashes" count={stashes.length}>

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api } from "./api";
 import RepoOpen from "./components/RepoOpen";
 import TabBar, { RepoTab } from "./components/TabBar";
@@ -40,6 +42,15 @@ export default function App() {
   const [cloneOpen, setCloneOpen] = useState(false);
   const [restoring, setRestoring] = useState(true);
   const restoringRef = useRef(true);
+
+  useEffect(() => {
+    // Subtle, always-correct version display — reads the actually-running
+    // binary's version rather than a string that'd need updating by hand
+    // on every release, so it can never drift from reality.
+    getVersion()
+      .then((v) => getCurrentWindow().setTitle(`uGit — v${v}`))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const session = loadSession();
@@ -167,7 +178,7 @@ export default function App() {
             className="app-shell-pane"
             style={{ display: tab.id === activeId ? "flex" : "none" }}
           >
-            <RepoView repoPath={tab.path} />
+            <RepoView repoPath={tab.path} isActive={tab.id === activeId} />
           </div>
         ))}
         {activeId === null && (

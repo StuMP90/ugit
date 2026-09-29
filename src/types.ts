@@ -78,6 +78,7 @@ export interface StashInfo {
 export interface TagInfo {
   name: string;
   target: string;
+  time: number;
 }
 
 // A selectable row in the commit graph: either the special "working changes"

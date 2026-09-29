@@ -3,6 +3,25 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.3.0] - 2026-09-29
+
+### Added
+- **Stale-tab auto-refresh.** A repo tab left in the background for more
+  than 15 minutes now silently refreshes when you switch back to it, so
+  you're never looking at data that's gone stale without knowing it —
+  verified by making an external commit to a backgrounded tab's repo and
+  confirming it appeared automatically on switching back. (Audited every
+  other mutating action in the app for the same gap — commit, push,
+  merge, rebase, stash, tags, and remotes all already refresh correctly;
+  the only real gap was tab-switching itself.)
+- **Running version shown in the window title** (`uGit — v2.3.0`) — reads
+  the actually-running binary's version, so it can't drift out of sync
+  the way a hand-maintained string could.
+- **Tags list sorted most-recent-first** (by target commit time, not tag
+  creation order — so retroactively tagging an older commit sorts it
+  correctly) and collapsed to the latest 10 with a "Show all N tags…"
+  toggle for repos with a longer tag history.
+
 ## [2.2.1] - 2026-09-29
 
 ### Fixed
