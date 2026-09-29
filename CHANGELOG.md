@@ -3,6 +3,17 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.2.1] - 2026-09-29
+
+### Fixed
+- The "Create GitHub release" button showed for every tag, including ones
+  that already had a release — clicking it would just fail with GitHub's
+  `422 already_exists`. uGit now fetches the repo's existing releases
+  alongside the rest of its data (GitHub repos only; fails open and silent
+  on any error, e.g. not signed in, so it never blocks the UI or forces a
+  sign-in prompt from a background fetch) and shows a "view release" link
+  instead of "create" for any tag that already has one.
+
 ## [2.2.0] - 2026-09-29
 
 ### Added

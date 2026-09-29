@@ -458,3 +458,25 @@ pub fn github_create_release(
         .map_err(|e| e.to_string())?;
     Ok(release)
 }
+
+/// Lists a repo's existing GitHub Releases (most recent 100), so the UI can
+/// tell which tags already have one — e.g. to avoid offering "Create
+/// release" on a tag that would just fail with a 422 "already_exists".
+#[tauri::command]
+pub fn github_list_releases(remote_url: String) -> Result<Vec<GithubRelease>, String> {
+    let (owner, repo) =
+        parse_github_owner_repo(&remote_url).ok_or("Not a github.com remote")?;
+    let token = valid_access_token()?.ok_or(NEEDS_GITHUB_AUTH)?;
+
+    let releases: Vec<GithubRelease> = agent()
+        .get(&format!(
+            "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
+        ))
+        .set("Authorization", &format!("Bearer {token}"))
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(map_api_error)?
+        .into_json()
+        .map_err(|e| e.to_string())?;
+    Ok(releases)
+}

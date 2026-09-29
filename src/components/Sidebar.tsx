@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { BranchInfo, RemoteInfo, StashInfo, TagInfo } from "../types";
+import type { BranchInfo, GithubRelease, RemoteInfo, StashInfo, TagInfo } from "../types";
+import { isGithubRemoteUrl } from "../githubUtils";
 
 interface Props {
   branches: BranchInfo[];
@@ -19,6 +20,8 @@ interface Props {
   onPushTag: (name: string) => void;
   onDeleteTag: (name: string) => void;
   onCreateRelease: (name: string) => void;
+  onViewRelease: (url: string) => void;
+  releases: GithubRelease[];
 }
 
 function Section({
@@ -65,6 +68,8 @@ export default function Sidebar({
   onPushTag,
   onDeleteTag,
   onCreateRelease,
+  onViewRelease,
+  releases,
 }: Props) {
   const local = branches.filter((b) => !b.is_remote);
   const remote = branches.filter((b) => b.is_remote);
@@ -72,8 +77,9 @@ export default function Sidebar({
   // offer the action when origin actually points at github.com, rather
   // than showing a button that would just fail for e.g. a GitLab remote.
   const isGithubOrigin = remotes.some(
-    (r) => r.name === "origin" && /(^|@|\/)github\.com[:/]/.test(r.url)
+    (r) => r.name === "origin" && isGithubRemoteUrl(r.url)
   );
+  const releaseByTag = new Map(releases.map((r) => [r.tag_name, r]));
 
   return (
     <div className="sidebar">
@@ -213,20 +219,35 @@ export default function Sidebar({
           </button>
         }
       >
-        {tags.map((t) => (
+        {tags.map((t) => {
+          const release = releaseByTag.get(t.name);
+          return (
           <div key={t.name} className="sidebar-item">
             <span className="sidebar-item-label">{t.name}</span>
             {isGithubOrigin && (
-              <button
-                className="icon-btn"
-                title={`Create a GitHub release from "${t.name}"`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCreateRelease(t.name);
-                }}
-              >
-                R
-              </button>
+              release ? (
+                <button
+                  className="icon-btn"
+                  title={`View GitHub release for "${t.name}"`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewRelease(release.html_url);
+                  }}
+                >
+                  ⇗
+                </button>
+              ) : (
+                <button
+                  className="icon-btn"
+                  title={`Create a GitHub release from "${t.name}"`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateRelease(t.name);
+                  }}
+                >
+                  R
+                </button>
+              )
             )}
             <button
               className="icon-btn"
@@ -249,7 +270,8 @@ export default function Sidebar({
               ✕
             </button>
           </div>
-        ))}
+          );
+        })}
       </Section>
 
       <Section title="Stashes" count={stashes.length}>

@@ -172,6 +172,9 @@ export const api = {
       prerelease,
     }),
 
+  githubListReleases: (remoteUrl: string) =>
+    invoke<GithubRelease[]>("github_list_releases", { remoteUrl }),
+
   sshStatus: () => invoke<SshStatus>("ssh_status"),
 
   sshSetCustomKey: (path: string) => invoke<void>("ssh_set_custom_key", { path }),

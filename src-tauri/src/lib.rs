@@ -68,6 +68,7 @@ pub fn run() {
             github::github_list_repos,
             github::github_create_repo,
             github::github_create_release,
+            github::github_list_releases,
             ssh::ssh_status,
             ssh::ssh_set_custom_key,
             ssh::ssh_clear_custom_key,

@@ -55,7 +55,8 @@ along with checksums to verify each download. Prefer to build it yourself instea
   you don't have yet, uGit prompts for it right there and retries automatically once you're
   signed in. Existing tags can also become GitHub Releases (title, notes, draft/pre-release) in
   one step — a pushed git tag alone never shows up under a repo's Releases; creating one is a
-  separate, deliberate GitHub action, not an automatic side effect of pushing a tag.
+  separate, deliberate GitHub action, not an automatic side effect of pushing a tag. A tag that
+  already has a release shows a link to view it instead of a duplicate "create" button.
 - **Session memory** — reopens the same tabs (and the same active tab) you had open last time,
   remembers the last folder you browsed to in the Open/New Repository dialog, and restores the
   window's size and position.

@@ -5,6 +5,7 @@ import type {
   BranchInfo,
   CommitInfo,
   FileDiff,
+  GithubRelease,
   RebaseProgress,
   RemoteInfo,
   RepoState,
@@ -13,6 +14,7 @@ import type {
   StashInfo,
   TagInfo,
 } from "./types";
+import { isGithubRemoteUrl } from "./githubUtils";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import CommitGraph from "./components/CommitGraph";
@@ -50,6 +52,7 @@ export default function RepoView({ repoPath }: Props) {
   const [tags, setTags] = useState<TagInfo[]>([]);
   const [stashes, setStashes] = useState<StashInfo[]>([]);
   const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
+  const [releases, setReleases] = useState<GithubRelease[]>([]);
   const [repoState, setRepoState] = useState<RepoState | null>(null);
   const [rebaseProgress, setRebaseProgress] = useState<RebaseProgress | null>(null);
 
@@ -140,6 +143,32 @@ export default function RepoView({ repoPath }: Props) {
     runAction(refreshAll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]);
+
+  // Separate from refreshAll: this is best-effort, GitHub-only, and must
+  // never block the rest of the UI on GitHub's API being reachable. On any
+  // failure (not signed in, offline, etc.) it fails open — leaving
+  // "Create release" available on every tag — rather than surfacing an
+  // error or, worse, popping the sign-in prompt from a passive background
+  // fetch nobody asked for.
+  useEffect(() => {
+    const origin = remotes.find((r) => r.name === "origin");
+    if (!origin || !isGithubRemoteUrl(origin.url)) {
+      setReleases([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .githubListReleases(origin.url)
+      .then((r) => {
+        if (!cancelled) setReleases(r);
+      })
+      .catch(() => {
+        if (!cancelled) setReleases([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [remotes]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -489,6 +518,8 @@ export default function RepoView({ repoPath }: Props) {
             )
           }
           onCreateRelease={(name) => setReleaseTag(name)}
+          onViewRelease={(url) => openUrl(url).catch(() => {})}
+          releases={releases}
         />
 
         <div className="graph-column">
@@ -736,6 +767,7 @@ export default function RepoView({ repoPath }: Props) {
                 prerelease
               );
               setInfo(`Created release "${release.tag_name}"`);
+              setReleases((prev) => [...prev, release]);
               openUrl(release.html_url).catch(() => {});
             })();
           }}
