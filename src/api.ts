@@ -43,6 +43,14 @@ export const api = {
 
   getTags: (repoPath: string) => invoke<TagInfo[]>("get_tags", { repoPath }),
 
+  createTag: (repoPath: string, name: string, target: string | null, message: string | null) =>
+    invoke<TagInfo>("create_tag", { repoPath, name, target, message }),
+
+  deleteTag: (repoPath: string, name: string) => invoke<void>("delete_tag", { repoPath, name }),
+
+  pushTag: (repoPath: string, remote: string, name: string) =>
+    invoke<void>("push_tag", { repoPath, remote, name }),
+
   getCommitDiff: (repoPath: string, commitId: string) =>
     invoke<FileDiff[]>("get_commit_diff", { repoPath, commitId }),
 

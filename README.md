@@ -40,6 +40,9 @@ along with checksums to verify each download. Prefer to build it yourself instea
   Resolved conflicts stay clearly marked and stay editable (pick both sides and hand-tune the
   result), and long unchanged stretches of a file collapse out of the way automatically.
 - **Branch reset** — soft/mixed/hard reset the current branch to any earlier commit.
+- **Tags** — create annotated or lightweight tags on the current commit, push them to a remote
+  (immediately on creation, or later with one click), and delete them locally — everything a
+  release needs, without dropping to a shell.
 - **Stashing** — save, apply, pop, and drop stashes.
 - **Remotes** — add remotes, and fetch/pull/push with SSH-agent, `~/.ssh` key, and git
   credential-helper authentication, tried in that order. If an SSH remote (e.g. one set up by

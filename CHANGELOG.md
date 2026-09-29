@@ -3,6 +3,18 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.1.0] - 2026-09-29
+
+### Added
+- **Tag creation, pushing, and deletion.** Previously uGit could only list
+  existing tags — creating or pushing a release tag meant dropping to a
+  shell. The Tags section in the sidebar now has a "+" to create a tag
+  (annotated with a message, or lightweight if left blank) on the current
+  commit, with an option to push it to `origin` immediately; each existing
+  tag gets its own push and delete controls. Deleting a tag only removes
+  it locally, mirroring how branch deletion already works — it never
+  touches the tag on the remote.
+
 ## [2.0.0] - 2026-09-14
 
 Version bump only — no functional changes since 0.1.11. Marks uGit as feature-complete for its

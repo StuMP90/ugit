@@ -977,6 +977,14 @@ button {
   font-size: 12px;
   color: var(--text-1);
 }
+.modal label.checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.modal label.checkbox-row input {
+  width: auto;
+}
 
 /* ---------- GitHub modal ---------- */
 

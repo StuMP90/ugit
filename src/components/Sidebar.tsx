@@ -15,6 +15,9 @@ interface Props {
   onStashPop: (index: number) => void;
   onStashDrop: (index: number) => void;
   onAddRemote: () => void;
+  onCreateTag: () => void;
+  onPushTag: (name: string) => void;
+  onDeleteTag: (name: string) => void;
 }
 
 function Section({
@@ -57,6 +60,9 @@ export default function Sidebar({
   onStashPop,
   onStashDrop,
   onAddRemote,
+  onCreateTag,
+  onPushTag,
+  onDeleteTag,
 }: Props) {
   const local = branches.filter((b) => !b.is_remote);
   const remote = branches.filter((b) => b.is_remote);
@@ -183,10 +189,45 @@ export default function Sidebar({
         ))}
       </Section>
 
-      <Section title="Tags" count={tags.length}>
+      <Section
+        title="Tags"
+        count={tags.length}
+        action={
+          <button
+            className="icon-btn"
+            title="New tag"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateTag();
+            }}
+          >
+            +
+          </button>
+        }
+      >
         {tags.map((t) => (
           <div key={t.name} className="sidebar-item">
             <span className="sidebar-item-label">{t.name}</span>
+            <button
+              className="icon-btn"
+              title={`Push tag "${t.name}" to origin`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPushTag(t.name);
+              }}
+            >
+              ⇧
+            </button>
+            <button
+              className="icon-btn"
+              title="Delete tag"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteTag(t.name);
+              }}
+            >
+              ✕
+            </button>
           </div>
         ))}
       </Section>

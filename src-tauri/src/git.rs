@@ -949,21 +949,24 @@ pub fn pull(app: tauri::AppHandle, repo_path: String) -> Result<String, String> 
     Err("Cannot fast-forward: branches have diverged. Merge manually.".to_string())
 }
 
-#[tauri::command]
-pub fn push(
-    app: tauri::AppHandle,
-    repo_path: String,
-    remote: String,
-    branch: String,
-    set_upstream: bool,
-) -> Result<(), String> {
-    let repo = open_repo(&repo_path)?;
-    let mut r = repo.find_remote(&remote).map_err(|e| e.to_string())?;
-    let custom_key = crate::ssh::load_custom_key_path(&app);
+/// Pushes `refspec` through the named remote, retrying over HTTPS with the
+/// signed-in GitHub token (see `fetch_via_https_fallback`'s doc comment for
+/// why) if that fails. Returns `Ok(true)` if the HTTPS fallback was needed,
+/// `Ok(false)` if the named remote's own push just worked — callers that
+/// maintain a local remote-tracking ref (branches; tags have no such thing)
+/// need to know which, since an anonymous fallback remote has no configured
+/// refspec to update one automatically.
+fn push_refspec(
+    repo: &Repository,
+    remote_name: &str,
+    refspec: &str,
+    custom_key: Option<PathBuf>,
+) -> Result<bool, String> {
+    let mut r = repo.find_remote(remote_name).map_err(|e| e.to_string())?;
     let mut opts = git2::PushOptions::new();
     opts.remote_callbacks(remote_callbacks(custom_key.clone()));
-    let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
-    match r.push(&[refspec.as_str()], Some(&mut opts)) {
+    match r.push(&[refspec], Some(&mut opts)) {
+        Ok(()) => Ok(false),
         Err(e) => {
             let https_url = match r.url().and_then(crate::github::github_ssh_to_https) {
                 Some(u) => u,
@@ -975,25 +978,42 @@ pub fn push(
             let mut anon = repo.remote_anonymous(&https_url).map_err(|e| e.to_string())?;
             let mut opts2 = git2::PushOptions::new();
             opts2.remote_callbacks(remote_callbacks(custom_key));
-            anon.push(&[refspec.as_str()], Some(&mut opts2))
+            anon.push(&[refspec], Some(&mut opts2))
                 .map_err(|e| e.to_string())?;
-            // Unlike a push through the named remote, an anonymous remote has
-            // no configured refspec to auto-update the local remote-tracking
-            // branch — without this, origin/<branch> would keep pointing at
-            // the pre-push commit even though the push itself succeeded.
-            let local_oid = repo
-                .find_branch(&branch, BranchType::Local)
-                .and_then(|b| b.get().target().ok_or_else(|| git2::Error::from_str("no target")))
-                .map_err(|e| e.to_string())?;
-            repo.reference(
-                &format!("refs/remotes/{remote}/{branch}"),
-                local_oid,
-                true,
-                "push (https fallback)",
-            )
-            .map_err(|e| e.to_string())?;
+            Ok(true)
         }
-        Ok(()) => {}
+    }
+}
+
+#[tauri::command]
+pub fn push(
+    app: tauri::AppHandle,
+    repo_path: String,
+    remote: String,
+    branch: String,
+    set_upstream: bool,
+) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
+    let custom_key = crate::ssh::load_custom_key_path(&app);
+    let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
+    let used_fallback = push_refspec(&repo, &remote, &refspec, custom_key)?;
+
+    if used_fallback {
+        // Unlike a push through the named remote, an anonymous remote has
+        // no configured refspec to auto-update the local remote-tracking
+        // branch — without this, origin/<branch> would keep pointing at
+        // the pre-push commit even though the push itself succeeded.
+        let local_oid = repo
+            .find_branch(&branch, BranchType::Local)
+            .and_then(|b| b.get().target().ok_or_else(|| git2::Error::from_str("no target")))
+            .map_err(|e| e.to_string())?;
+        repo.reference(
+            &format!("refs/remotes/{remote}/{branch}"),
+            local_oid,
+            true,
+            "push (https fallback)",
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     if set_upstream {
@@ -1004,6 +1024,57 @@ pub fn push(
             .set_upstream(Some(&format!("{remote}/{branch}")))
             .map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+/// Creates a tag pointing at `target` (a revspec — commit sha, branch name,
+/// `HEAD`, etc.; defaults to `HEAD` when omitted). A non-empty `message`
+/// creates a real annotated tag object (the norm for releases); an empty or
+/// absent one creates a lightweight tag (just a ref, no tag object) —
+/// mirroring the choice `git tag` itself makes based on `-m`.
+#[tauri::command]
+pub fn create_tag(
+    repo_path: String,
+    name: String,
+    target: Option<String>,
+    message: Option<String>,
+) -> Result<TagInfo, String> {
+    let repo = open_repo(&repo_path)?;
+    let target_obj = repo
+        .revparse_single(target.as_deref().unwrap_or("HEAD"))
+        .map_err(|e| e.to_string())?;
+
+    let oid = match message.as_deref().map(str::trim).filter(|m| !m.is_empty()) {
+        Some(msg) => {
+            let sig = repo.signature().map_err(|e| e.to_string())?;
+            repo.tag(&name, &target_obj, &sig, msg, false)
+                .map_err(|e| e.to_string())?
+        }
+        None => repo
+            .tag_lightweight(&name, &target_obj, false)
+            .map_err(|e| e.to_string())?,
+    };
+    Ok(TagInfo { name, target: oid.to_string() })
+}
+
+#[tauri::command]
+pub fn delete_tag(repo_path: String, name: String) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
+    repo.tag_delete(&name).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn push_tag(
+    app: tauri::AppHandle,
+    repo_path: String,
+    remote: String,
+    name: String,
+) -> Result<(), String> {
+    let repo = open_repo(&repo_path)?;
+    let custom_key = crate::ssh::load_custom_key_path(&app);
+    let refspec = format!("refs/tags/{name}:refs/tags/{name}");
+    push_refspec(&repo, &remote, &refspec, custom_key)?;
     Ok(())
 }
 

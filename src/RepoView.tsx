@@ -21,11 +21,12 @@ import DiffView from "./components/DiffView";
 import ConflictView from "./components/ConflictView";
 import MergeRebaseBanner from "./components/MergeRebaseBanner";
 import PromptModal from "./components/PromptModal";
+import CreateTagModal from "./components/CreateTagModal";
 import ConfirmDialog from "./components/ConfirmDialog";
 import AddRemoteModal from "./components/AddRemoteModal";
 import GitHubModal from "./components/GitHubModal";
 
-type Modal = null | "branch" | "stash";
+type Modal = null | "branch" | "stash" | "tag";
 
 interface ConfirmState {
   message: string;
@@ -462,6 +463,28 @@ export default function RepoView({ repoPath }: Props) {
               })
             );
           }}
+          onCreateTag={() => setModal("tag")}
+          onPushTag={(name) => {
+            if (remotes.length === 0) {
+              setNoRemoteChoiceOpen(true);
+              return;
+            }
+            withGithubAuthRetry(async () => {
+              await api.pushTag(repoPath, "origin", name);
+              setInfo(`Pushed tag "${name}"`);
+            })();
+          }}
+          onDeleteTag={(name) =>
+            askConfirm(
+              `Delete tag "${name}"? This only removes it locally — it won't touch the tag on origin.`,
+              () =>
+                runAction(async () => {
+                  await api.deleteTag(repoPath, name);
+                  await refreshAll();
+                }),
+              "Delete tag"
+            )
+          }
         />
 
         <div className="graph-column">
@@ -663,6 +686,29 @@ export default function RepoView({ repoPath }: Props) {
               await api.createBranch(repoPath, name, null, true);
               await refreshAll();
             });
+          }}
+        />
+      )}
+
+      {modal === "tag" && (
+        <CreateTagModal
+          onCancel={() => setModal(null)}
+          onConfirm={(name, message, push) => {
+            setModal(null);
+            if (push) {
+              withGithubAuthRetry(async () => {
+                await api.createTag(repoPath, name, null, message || null);
+                await refreshAll();
+                await api.pushTag(repoPath, "origin", name);
+                setInfo(`Created and pushed tag "${name}"`);
+              })();
+            } else {
+              runAction(async () => {
+                await api.createTag(repoPath, name, null, message || null);
+                await refreshAll();
+                setInfo(`Created tag "${name}"`);
+              });
+            }
           }}
         />
       )}
