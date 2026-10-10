@@ -107,10 +107,15 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: Release ${{ github.ref_name }}
+          # The linux job's upload-artifact step gave it three patterns under different
+          # subdirectories (deb/, rpm/, appimage/); upload-artifact roots the artifact at
+          # their least common ancestor and keeps that structure, so it's still nested one
+          # level deeper here after download — unlike the single-pattern msix artifact below,
+          # which has no sibling directory to root against and lands flat.
           files: |
-            dist/*.deb
-            dist/*.rpm
-            dist/*.AppImage
+            dist/deb/*.deb
+            dist/rpm/*.rpm
+            dist/appimage/*.AppImage
             dist/*.msix
           draft: false
           prerelease: false
