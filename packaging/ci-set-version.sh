@@ -17,11 +17,15 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
+# cd (not a captured `pwd` string) so every tool below resolves its own relative paths against
+# the real OS working directory. On Windows' Git Bash, `pwd` prints an MSYS-style path
+# (/d/a/ugit/ugit) that a native Windows node.exe misreads as a literal subfolder named "d" under
+# the current drive root — pasting that string into another process's source is the bug to avoid.
+cd "$(dirname "$0")/.."
 
 node -e "
   const fs = require('fs');
-  for (const f of ['$root/package.json', '$root/src-tauri/tauri.conf.json']) {
+  for (const f of ['package.json', 'src-tauri/tauri.conf.json']) {
     const j = JSON.parse(fs.readFileSync(f, 'utf8'));
     j.version = '$version';
     fs.writeFileSync(f, JSON.stringify(j, null, 2) + '\n');
@@ -30,6 +34,6 @@ node -e "
 
 # Only the [package] table's own version (the file's first 'version = ' line) — dependency
 # tables further down can contain the same key (e.g. 'serde = { version = "1", ... }').
-sed -i "0,/^version = \".*\"/{s/^version = \".*\"/version = \"$version\"/}" "$root/src-tauri/Cargo.toml"
+sed -i "0,/^version = \".*\"/{s/^version = \".*\"/version = \"$version\"/}" src-tauri/Cargo.toml
 
 echo "Stamped version $version into package.json, tauri.conf.json, Cargo.toml"
