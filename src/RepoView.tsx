@@ -15,6 +15,7 @@ import type {
   TagInfo,
 } from "./types";
 import { isGithubRemoteUrl } from "./githubUtils";
+import { resolveDefaultRemote } from "./remoteUtils";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import CommitGraph from "./components/CommitGraph";
@@ -169,14 +170,14 @@ export default function RepoView({ repoPath, isActive }: Props) {
   // error or, worse, popping the sign-in prompt from a passive background
   // fetch nobody asked for.
   useEffect(() => {
-    const origin = remotes.find((r) => r.name === "origin");
-    if (!origin || !isGithubRemoteUrl(origin.url)) {
+    const githubRemote = remotes.find((r) => isGithubRemoteUrl(r.url));
+    if (!githubRemote) {
       setReleases([]);
       return;
     }
     let cancelled = false;
     api
-      .githubListReleases(origin.url)
+      .githubListReleases(githubRemote.url)
       .then((r) => {
         if (!cancelled) setReleases(r);
       })
@@ -339,7 +340,8 @@ export default function RepoView({ repoPath, isActive }: Props) {
           setInfo("Refreshed");
         })}
         onFetch={withGithubAuthRetry(async () => {
-          await api.fetch(repoPath);
+          const remote = resolveDefaultRemote(branches, remotes, status?.branch);
+          await api.fetch(repoPath, remote ?? undefined);
           await refreshAll();
           setInfo("Fetched");
         })}
@@ -356,7 +358,9 @@ export default function RepoView({ repoPath, isActive }: Props) {
           withGithubAuthRetry(async () => {
             if (!status?.branch) throw new Error("No current branch");
             const b = branches.find((br) => !br.is_remote && br.name === status.branch);
-            await api.push(repoPath, "origin", status.branch, !b?.upstream);
+            const remote = resolveDefaultRemote(branches, remotes, status.branch);
+            if (!remote) throw new Error("No remote configured");
+            await api.push(repoPath, remote, status.branch, !b?.upstream);
             await refreshAll();
             setInfo("Pushed");
           })();
@@ -441,6 +445,14 @@ export default function RepoView({ repoPath, isActive }: Props) {
                 if (already.target) await selectCommitAndScroll(already.target);
                 return;
               }
+              // A remote branch has no local counterpart to switch to —
+              // clicking one is browsing, not an instruction to detach
+              // HEAD at it, so just jump the commit list to it.
+              const target = branches.find((b) => b.name === name);
+              if (target?.is_remote) {
+                if (target.target) await selectCommitAndScroll(target.target);
+                return;
+              }
               await api.checkoutBranch(repoPath, name);
               await refreshAll();
               const fresh = await api.getBranches(repoPath);
@@ -520,7 +532,9 @@ export default function RepoView({ repoPath, isActive }: Props) {
               return;
             }
             withGithubAuthRetry(async () => {
-              await api.pushTag(repoPath, "origin", name);
+              const remote = resolveDefaultRemote(branches, remotes, status?.branch);
+              if (!remote) throw new Error("No remote configured");
+              await api.pushTag(repoPath, remote, name);
               setInfo(`Pushed tag "${name}"`);
             })();
           }}
@@ -752,7 +766,9 @@ export default function RepoView({ repoPath, isActive }: Props) {
               withGithubAuthRetry(async () => {
                 await api.createTag(repoPath, name, null, message || null);
                 await refreshAll();
-                await api.pushTag(repoPath, "origin", name);
+                const remote = resolveDefaultRemote(branches, remotes, status?.branch);
+                if (!remote) throw new Error("No remote configured");
+                await api.pushTag(repoPath, remote, name);
                 setInfo(`Created and pushed tag "${name}"`);
               })();
             } else {
@@ -774,10 +790,10 @@ export default function RepoView({ repoPath, isActive }: Props) {
             const tag = releaseTag;
             setReleaseTag(null);
             withGithubAuthRetry(async () => {
-              const origin = remotes.find((r) => r.name === "origin");
-              if (!origin) throw new Error('No "origin" remote configured');
+              const githubRemote = remotes.find((r) => isGithubRemoteUrl(r.url));
+              if (!githubRemote) throw new Error("No github.com remote configured");
               const release = await api.githubCreateRelease(
-                origin.url,
+                githubRemote.url,
                 tag,
                 name || null,
                 body || null,

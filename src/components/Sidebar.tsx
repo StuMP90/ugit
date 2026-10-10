@@ -76,11 +76,11 @@ export default function Sidebar({
   const local = branches.filter((b) => !b.is_remote);
   const remote = branches.filter((b) => b.is_remote);
   // GitHub Releases are a GitHub-specific concept (not plain git) — only
-  // offer the action when origin actually points at github.com, rather
-  // than showing a button that would just fail for e.g. a GitLab remote.
-  const isGithubOrigin = remotes.some(
-    (r) => r.name === "origin" && isGithubRemoteUrl(r.url)
-  );
+  // offer the action when some remote actually points at github.com
+  // (whatever it's named — never assume a remote is called "origin"),
+  // rather than showing a button that would just fail for e.g. a GitLab
+  // remote.
+  const hasGithubRemote = remotes.some((r) => isGithubRemoteUrl(r.url));
   const releaseByTag = new Map(releases.map((r) => [r.tag_name, r]));
   // Backend already returns tags most-recent-first (by target commit time)
   // — just slice for display here.
@@ -230,7 +230,7 @@ export default function Sidebar({
           return (
           <div key={t.name} className="sidebar-item">
             <span className="sidebar-item-label">{t.name}</span>
-            {isGithubOrigin && (
+            {hasGithubRemote && (
               release ? (
                 <button
                   className="icon-btn"

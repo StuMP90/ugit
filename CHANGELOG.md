@@ -3,6 +3,27 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.3.1] - 2026-10-10
+
+### Fixed
+- **Push/fetch/tag-push/release-creation all assumed a remote named
+  "origin" existed.** Any repo whose only remote was named something else
+  (e.g. one created through GitKraken's flow, which names it after the
+  current branch) hit a `remote 'origin' does not exist` error on every
+  push and fetch. These actions now resolve the right remote the same way
+  plain `git push`/`git pull` would — the current branch's configured
+  upstream remote, falling back to the repo's only remote, then one
+  literally named "origin" if present, then whichever remote is first.
+  GitHub-specific actions (Create Release) now look for any remote
+  pointing at github.com rather than requiring it be named "origin".
+- **Clicking a remote-tracking branch silently detached `HEAD`.** The
+  branch list's "jump to it" click handler for remote branches was
+  actually calling the same checkout path as local branches, performing a
+  real `git checkout` to the remote branch's raw commit SHA and leaving
+  the repo in a detached-HEAD state — visible as "HEAD" / "detached"
+  badges after the next refresh. Clicking a remote branch now only
+  scrolls the commit list to it, as documented, without touching `HEAD`.
+
 ## [2.3.0] - 2026-09-29
 
 ### Added
