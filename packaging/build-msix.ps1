@@ -59,7 +59,9 @@ Pop-Location
 
 $releaseDir = Join-Path $root "src-tauri/target/release"
 Copy-Item (Join-Path $releaseDir "ugit.exe") (Join-Path $layout "ugit.exe")
-Copy-Item (Join-Path $releaseDir "WebView2Loader.dll") (Join-Path $layout "WebView2Loader.dll")
+# No WebView2Loader.dll to copy here: that's only a loose runtime dependency on the GNU/gnullvm
+# cross-compile path documented in the README. On this native msvc target, WebView2LoaderStatic.lib
+# is linked straight into ugit.exe at compile time, so there's nothing separate to ship.
 
 Copy-Item -Recurse (Join-Path $root "src-tauri/icons") (Join-Path $layout "icons")
 (Get-Content (Join-Path $root "packaging/msix/AppxManifest.xml") -Raw) `

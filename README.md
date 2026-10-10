@@ -207,11 +207,11 @@ Output: `src-tauri/target/x86_64-pc-windows-gnullvm/release/ugit.exe`, plus
 unwind runtime are baked in via `-C target-feature=+crt-static` in
 `src-tauri/.cargo/config.toml`, avoiding a dependency on `libunwind.dll`, which Windows doesn't
 ship and which the `gnullvm` toolchain otherwise links dynamically by default) — but
-`WebView2Loader.dll` is a small loader stub that every WebView2 app needs sitting next to its
-`.exe` regardless of how the app itself was built or linked; this is normal (the same requirement
-any Chromium-embedding app has), not something specific to uGit's cross-compiled build. The build
-already places it next to `ugit.exe`; just make sure both come along when you copy the exe
-somewhere else.
+`WebView2Loader.dll` is a small loader stub needed alongside the `.exe` — specifically on this
+`gnullvm` (GNU-toolchain) build. (MSVC builds, like the Store/MSIX path below, statically link
+`WebView2LoaderStatic.lib` straight into the executable instead, so they produce no such file at
+all — don't go looking for one if you're on that path.) The build already places it next to
+`ugit.exe` here; just make sure both come along when you copy the exe somewhere else.
 
 **Gotcha:** if you only changed frontend files (nothing under `src-tauri/src/`) since the last
 Windows build, plain `cargo build` won't notice `dist/` changed and will silently skip rebuilding

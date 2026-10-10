@@ -158,8 +158,11 @@ above — then revert the width/height change before shipping (see README → Pa
 
 ## Store logos
 
-Partner Center → Store listing → Store logos: `StoreLogo.png` (already Store-sized) from
-`src-tauri/icons/`. The tile and taskbar icons are inside the package.
+Partner Center → Store listing → Store logos wants these uploaded separately from the package
+(it doesn't read them out of the `.msix`): [`StoreLogo-300x300.png`](StoreLogo-300x300.png)
+(required), plus the 150 and 71 sizes — all three are in this folder, generated from
+`src-tauri/icons/icon.png`. The tile and taskbar icons the OS itself uses are inside the package
+already (`src-tauri/icons/`), separate from these.
 
 ## Additional system requirements
 
