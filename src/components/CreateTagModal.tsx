@@ -10,10 +10,16 @@ export default function CreateTagModal({ onConfirm, onCancel }: Props) {
   const [message, setMessage] = useState("");
   const [push, setPush] = useState(true);
 
-  const canSubmit = name.trim().length > 0;
+  const trimmedName = name.trim();
+  // A tag starting with an uppercase "V" followed by a digit is almost always a mis-typed
+  // version tag, not a deliberate name — and it's a real trap: GitHub Actions' tag-push
+  // triggers (e.g. `tags: ['v*']`) are case-sensitive, so a stray capital silently skips CI
+  // instead of erroring. Catch it here rather than after it's already been pushed.
+  const looksLikeMiscasedVersion = /^V\d/.test(trimmedName);
+  const canSubmit = trimmedName.length > 0 && !looksLikeMiscasedVersion;
 
   function submit() {
-    if (canSubmit) onConfirm(name.trim(), message.trim(), push);
+    if (canSubmit) onConfirm(trimmedName, message.trim(), push);
   }
 
   return (
@@ -33,6 +39,12 @@ export default function CreateTagModal({ onConfirm, onCancel }: Props) {
             }}
           />
         </label>
+        {looksLikeMiscasedVersion && (
+          <p className="field-error">
+            Use a lowercase "v" — v{trimmedName.slice(1)}, not {trimmedName}. A capital V silently
+            skips release automation that only triggers on lowercase-v tags.
+          </p>
+        )}
         <label>
           Message (optional — leave blank for a lightweight tag)
           <input
