@@ -49,7 +49,7 @@ jobs:
             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - run: npm ci
       - run: npm run tauri build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ugit-linux
           path: |
@@ -81,7 +81,7 @@ jobs:
           -IdentityName "${{ vars.MSIX_IDENTITY_NAME || 'ugit.dev' }}"
           -Publisher "${{ vars.MSIX_PUBLISHER || 'CN=ugit-dev' }}"
           -PublisherDisplayName "${{ vars.MSIX_PUBLISHER_DISPLAY_NAME || 'uGit developer' }}"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ugit-msix
           path: artifacts/msix/*.msix
@@ -93,7 +93,7 @@ jobs:
     needs: [version, linux, msix]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
