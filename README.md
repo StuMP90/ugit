@@ -256,11 +256,17 @@ Verified running on an actual Windows 11 machine (not just cross-compiled and as
 
 [`.github/workflows/build.yml`](.github/workflows/build.yml) builds the Linux bundles (`.deb`,
 `.rpm`, `.AppImage`) and a Windows `.msix` on every push to `main`, every pull request, and manual
-runs — kept as workflow artifacts only. Pushing a version tag (`vX.Y.Z`, matching the version
-already bumped in `package.json`/`src-tauri/tauri.conf.json`/`src-tauri/Cargo.toml`) additionally
-creates a GitHub release with all four files attached. `packaging/ci-version.sh` enforces that the
-tag matches `package.json`'s version, so a forgotten version bump fails the build loudly instead
-of shipping a mismatched release.
+runs — kept as workflow artifacts only, versioned `0.0.<run number>`. Pushing a version tag
+(`git tag vX.Y.Z && git push origin vX.Y.Z`) builds and releases that version, with all four files
+attached to a new GitHub release.
+
+The tag is authoritative, not whatever's currently committed in
+`package.json`/`src-tauri/tauri.conf.json`/`src-tauri/Cargo.toml` — `packaging/ci-set-version.sh`
+stamps the tag's version into those files for the build (so a shipped artifact's own metadata,
+like the `.deb`'s package version or the exe's window title, matches the tag it came from), but
+that stamp is only ever applied to CI's own checkout and never committed back. There's no need to
+hand-bump the version before tagging; it's still worth keeping the committed version roughly
+current for local dev builds, but it doesn't have to match the next tag exactly.
 
 The Windows job builds natively on a `windows-latest` runner with the default
 `x86_64-pc-windows-msvc` target — not the `gnullvm` cross-compile toolchain documented above, which

@@ -1,35 +1,31 @@
 #!/usr/bin/env bash
 # Works out this CI run's version and writes it to $GITHUB_OUTPUT:
-#   version       x.y.z      from package.json — the single source of truth
+#   version       x.y.z      the single source of truth for this run
 #   msix_version  x.y.z.0    MSIX package (the Store requires the last part to be 0)
 #   is_release    true|false
 #
-# uGit's own release flow already bumps the version by hand in package.json,
-# src-tauri/tauri.conf.json and src-tauri/Cargo.toml before tagging (see README),
-# unlike a build that derives its version purely from the tag. So this script
-# doesn't invent a version — it reads the one already committed, and on a tag
-# push just checks that tag actually matches it, to catch a forgotten bump
-# before it ships as a mismatched release.
+# The tag is authoritative, not the committed version in package.json/tauri.conf.json/
+# Cargo.toml — pushing vX.Y.Z builds and releases X.Y.Z regardless of what's currently
+# committed there. packaging/ci-set-version.sh stamps this version into those files for
+# the build (so a shipped artifact's own metadata matches the tag it came from), but that
+# never gets committed back.
 #
-# Inputs (set by GitHub Actions): GITHUB_REF_TYPE, GITHUB_REF_NAME, GITHUB_OUTPUT.
+# Anything else (push to main, pull request, manual run) gets 0.0.<run number>, never
+# mistakable for a release.
+#
+# Inputs (set by GitHub Actions): GITHUB_REF_TYPE, GITHUB_REF_NAME, GITHUB_RUN_NUMBER, GITHUB_OUTPUT.
 set -euo pipefail
-
-root="$(cd "$(dirname "$0")/.." && pwd)"
-version="$(node -p "require('$root/package.json').version")"
-
-if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "::error::package.json version '$version' doesn't look like x.y.z" >&2
-  exit 1
-fi
 
 if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
   tag="${GITHUB_REF_NAME:-}"
-  if [[ "$tag" != "v$version" ]]; then
-    echo "::error::Tag '$tag' doesn't match package.json version '$version' — bump the version in package.json, src-tauri/tauri.conf.json and src-tauri/Cargo.toml first" >&2
+  if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    echo "::error::Release tag '$tag' must look like v1.2.3" >&2
     exit 1
   fi
+  version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
   is_release=true
 else
+  version="0.0.${GITHUB_RUN_NUMBER:-0}"
   is_release=false
 fi
 

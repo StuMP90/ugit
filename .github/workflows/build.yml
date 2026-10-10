@@ -1,10 +1,11 @@
 name: Build and Release
 
-# Pushing a tag vX.Y.Z (after bumping the version in package.json, src-tauri/tauri.conf.json
-# and src-tauri/Cargo.toml — see README) builds that version, then creates the GitHub release
+# Pushing a tag vX.Y.Z builds and releases that version — the tag is authoritative, not
+# whatever's currently committed in package.json/tauri.conf.json/Cargo.toml (ci-set-version.sh
+# stamps X.Y.Z into those for the build, but never commits it back). Creates the GitHub release
 # "Release vX.Y.Z" with generated notes and the binaries attached.
-# Pushes to main, pull requests and manual runs do the same builds, kept as workflow artifacts
-# only (ci-version.sh refuses to treat these as a release).
+# Pushes to main, pull requests and manual runs do the same builds with version 0.0.<run number>,
+# kept as workflow artifacts only.
 on:
   push:
     branches: [main]
@@ -47,6 +48,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: packaging/ci-set-version.sh "${{ needs.version.outputs.version }}"
       - run: npm ci
       - run: npm run tauri build
       - uses: actions/upload-artifact@v7
@@ -71,6 +73,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      - name: Stamp version
+        shell: bash
+        run: packaging/ci-set-version.sh "${{ needs.version.outputs.version }}"
       # Unsigned: for Store submission (the Store signs it). Set the identity values from
       # Partner Center as repository variables before submitting.
       - name: Build MSIX

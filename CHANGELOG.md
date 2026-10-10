@@ -3,6 +3,21 @@
 All notable changes to uGit are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [2.3.2] - 2026-10-10
+
+### Added
+- **CI builds.** Every push, pull request and manual run now builds the Linux bundles
+  (`.deb`/`.rpm`/`.AppImage`) and a Windows `.msix` in GitHub Actions; pushing a version tag that
+  matches the version already bumped in `package.json`/`tauri.conf.json`/`Cargo.toml` additionally
+  cuts a GitHub release with all four files attached. The Windows job builds natively on a
+  `windows-latest` runner with the standard `msvc` target, not the `gnullvm` cross-compile
+  documented for manual local builds.
+- **Microsoft Store packaging.** `packaging/build-msix.ps1` and `packaging/msix/AppxManifest.xml`
+  pack a Store-ready `.msix`, reusing the Store tile icons Tauri already generates in
+  `src-tauri/icons/`. `packaging/store/STORE-LISTING.md` has everything needed to submit in
+  Partner Center (description, screenshots, age rating, capability justification), and
+  [PRIVACY.md](PRIVACY.md) is the required privacy policy.
+
 ## [2.3.1] - 2026-10-10
 
 ### Fixed
