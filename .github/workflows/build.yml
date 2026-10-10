@@ -9,7 +9,11 @@ name: Build and Release
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    # Tag matching here is case-sensitive, unlike ci-version.sh's own check below — 'V*' is
+    # included so a stray capital letter still triggers the workflow and gets ci-version.sh's
+    # loud, clear rejection, instead of silently not running at all (as a V-prefixed tag
+    # created from uGit's own tag/release UI once did).
+    tags: ['v*', 'V*']
   pull_request:
   workflow_dispatch:
 
