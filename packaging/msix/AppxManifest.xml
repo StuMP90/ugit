@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest template. build-msix.ps1 fills in the $(...) tokens.
+
+  For a Microsoft Store submission, IdentityName, Publisher and PublisherDisplayName must be
+  exactly the values shown in Partner Center (Product management > Product identity).
+  The Store re-signs the package, so it does not need to be signed for submission.
+
+  Logo images are Tauri's own generated Windows Store tile set (src-tauri/icons/), not a
+  separate copy — they're already the right sizes because `tauri icon` produces them for
+  Tauri's own (unused, on this project) Windows bundler path.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="$(IdentityName)"
+    Publisher="$(Publisher)"
+    Version="$(Version)"
+    ProcessorArchitecture="$(Architecture)" />
+
+  <Properties>
+    <DisplayName>uGit</DisplayName>
+    <PublisherDisplayName>$(PublisherDisplayName)</PublisherDisplayName>
+    <Logo>icons\StoreLogo.png</Logo>
+    <Description>A visual git client for branches, commits, tags, stashes and GitHub.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="ugit" Executable="ugit.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="uGit"
+        Description="A visual git client for branches, commits, tags, stashes and GitHub"
+        BackgroundColor="transparent"
+        Square150x150Logo="icons\Square150x150Logo.png"
+        Square44x44Logo="icons\Square44x44Logo.png">
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Desktop (full trust) app: required for a Tauri/Win32 app in the Store. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

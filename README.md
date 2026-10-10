@@ -250,6 +250,52 @@ one button is affected (a clear error is shown); everything else works regardles
 
 Verified running on an actual Windows 11 machine (not just cross-compiled and assumed to work).
 
+## Packaging
+
+### CI builds
+
+[`.github/workflows/build.yml`](.github/workflows/build.yml) builds the Linux bundles (`.deb`,
+`.rpm`, `.AppImage`) and a Windows `.msix` on every push to `main`, every pull request, and manual
+runs — kept as workflow artifacts only. Pushing a version tag (`vX.Y.Z`, matching the version
+already bumped in `package.json`/`src-tauri/tauri.conf.json`/`src-tauri/Cargo.toml`) additionally
+creates a GitHub release with all four files attached. `packaging/ci-version.sh` enforces that the
+tag matches `package.json`'s version, so a forgotten version bump fails the build loudly instead
+of shipping a mismatched release.
+
+The Windows job builds natively on a `windows-latest` runner with the default
+`x86_64-pc-windows-msvc` target — not the `gnullvm` cross-compile toolchain documented above, which
+exists for building a Windows exe manually from this Linux machine without needing Windows at all.
+A real Windows runner sidesteps the GNU-linker symbol-limit problem that `gnullvm` works around, so
+CI doesn't need the `llvm-mingw` toolchain setup at all.
+
+### Microsoft Store (MSIX)
+
+`packaging/build-msix.ps1` builds `ugit.exe` (native `msvc` target) and packs it into an `.msix`
+using `packaging/msix/AppxManifest.xml` as a template and the Store tile icons already in
+`src-tauri/icons/` (generated once by `tauri icon`, not duplicated elsewhere). It needs the
+Windows 10/11 SDK for `makeappx.exe`, so it only runs on Windows (the CI `msix` job, or locally on
+a Windows machine).
+
+```powershell
+# Local sideload test, self-signed
+./packaging/build-msix.ps1 -SelfSign
+
+# Store submission build — unsigned; the Store re-signs it. Use the identity from
+# Partner Center (Product management > Product identity), exactly as shown there.
+./packaging/build-msix.ps1 -Version 1.2.3.0 -IdentityName <YourIdentityName> `
+    -Publisher "CN=<your-publisher-guid>" -PublisherDisplayName "<Your Name>"
+```
+
+CI passes these same identity values from repository variables (Settings → Secrets and variables
+→ Actions → Variables): `MSIX_IDENTITY_NAME`, `MSIX_PUBLISHER`, `MSIX_PUBLISHER_DISPLAY_NAME`. Set
+them from Partner Center before submitting a CI-built `.msix` to the Store — without them, CI
+builds with placeholder values suitable only for local sideload testing.
+
+Submission content (description, screenshots, age rating, capability justification) is kept in
+[`packaging/store/STORE-LISTING.md`](packaging/store/STORE-LISTING.md), ready to paste into
+Partner Center. The Store also requires a live privacy policy URL — uGit's is
+[PRIVACY.md](PRIVACY.md).
+
 ## User manual
 
 See [docs/manual.html](docs/manual.html) (or [docs/MANUAL.md](docs/MANUAL.md)) for a full walkthrough

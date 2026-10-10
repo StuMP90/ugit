@@ -1,0 +1,112 @@
+name: Build and Release
+
+# Pushing a tag vX.Y.Z (after bumping the version in package.json, src-tauri/tauri.conf.json
+# and src-tauri/Cargo.toml — see README) builds that version, then creates the GitHub release
+# "Release vX.Y.Z" with generated notes and the binaries attached.
+# Pushes to main, pull requests and manual runs do the same builds, kept as workflow artifacts
+# only (ci-version.sh refuses to treat these as a release).
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload its assets
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      msix_version: ${{ steps.version.outputs.msix_version }}
+      is_release: ${{ steps.version.outputs.is_release }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        run: packaging/ci-version.sh
+
+  linux:
+    needs: [version]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # Tauri v2's standard Linux build dependencies (webkit2gtk for the webview, appindicator
+      # for the tray, librsvg for icon rendering).
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: npm ci
+      - run: npm run tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ugit-linux
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: ${{ needs.version.outputs.is_release == 'true' && 30 || 14 }}
+
+  msix:
+    needs: [version]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # Unsigned: for Store submission (the Store signs it). Set the identity values from
+      # Partner Center as repository variables before submitting.
+      - name: Build MSIX
+        shell: pwsh
+        run: >
+          ./packaging/build-msix.ps1
+          -Version "${{ needs.version.outputs.msix_version }}"
+          -IdentityName "${{ vars.MSIX_IDENTITY_NAME || 'ugit.dev' }}"
+          -Publisher "${{ vars.MSIX_PUBLISHER || 'CN=ugit-dev' }}"
+          -PublisherDisplayName "${{ vars.MSIX_PUBLISHER_DISPLAY_NAME || 'uGit developer' }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ugit-msix
+          path: artifacts/msix/*.msix
+          retention-days: ${{ needs.version.outputs.is_release == 'true' && 30 || 14 }}
+
+  release:
+    # Only for version tags, and only once every build has succeeded.
+    if: needs.version.outputs.is_release == 'true'
+    needs: [version, linux, msix]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Release ${{ github.ref_name }}
+          files: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/*.msix
+          draft: false
+          prerelease: false
+          generate_release_notes: true
