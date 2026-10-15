@@ -16,6 +16,7 @@ import type {
 } from "./types";
 import { isGithubRemoteUrl } from "./githubUtils";
 import { resolveDefaultRemote } from "./remoteUtils";
+import { looksLikeMiscasedVersionTag } from "./tagUtils";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import CommitGraph from "./components/CommitGraph";
@@ -527,6 +528,16 @@ export default function RepoView({ repoPath, isActive }: Props) {
           }}
           onCreateTag={() => setModal("tag")}
           onPushTag={(name) => {
+            // Guards tag *creation* in CreateTagModal, but a mis-cased tag can still reach
+            // this button another way — fetched down from a remote where it already exists,
+            // or left over from before that check existed. Refuse to push it from here too,
+            // rather than only catching the mistake at the one place it's usually made.
+            if (looksLikeMiscasedVersionTag(name)) {
+              setError(
+                `Won't push "${name}" — it looks like a mis-cased version tag (should be lowercase "v${name.slice(1)}"). Delete it locally and recreate it with the correct case, then push that instead.`
+              );
+              return;
+            }
             if (remotes.length === 0) {
               setNoRemoteChoiceOpen(true);
               return;

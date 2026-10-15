@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { looksLikeMiscasedVersionTag } from "../tagUtils";
 
 interface Props {
   onConfirm: (name: string, message: string, push: boolean) => void;
@@ -11,11 +12,7 @@ export default function CreateTagModal({ onConfirm, onCancel }: Props) {
   const [push, setPush] = useState(true);
 
   const trimmedName = name.trim();
-  // A tag starting with an uppercase "V" followed by a digit is almost always a mis-typed
-  // version tag, not a deliberate name — and it's a real trap: GitHub Actions' tag-push
-  // triggers (e.g. `tags: ['v*']`) are case-sensitive, so a stray capital silently skips CI
-  // instead of erroring. Catch it here rather than after it's already been pushed.
-  const looksLikeMiscasedVersion = /^V\d/.test(trimmedName);
+  const looksLikeMiscasedVersion = looksLikeMiscasedVersionTag(trimmedName);
   const canSubmit = trimmedName.length > 0 && !looksLikeMiscasedVersion;
 
   function submit() {
