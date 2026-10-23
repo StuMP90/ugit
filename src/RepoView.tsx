@@ -14,7 +14,7 @@ import type {
   StashInfo,
   TagInfo,
 } from "./types";
-import { isGithubRemoteUrl } from "./githubUtils";
+import { isGithubRemoteUrl, preferredCloneUrl } from "./githubUtils";
 import { resolveDefaultRemote } from "./remoteUtils";
 import { looksLikeMiscasedVersionTag } from "./tagUtils";
 import TopBar from "./components/TopBar";
@@ -903,7 +903,8 @@ export default function RepoView({ repoPath, isActive }: Props) {
           onRepoReady={(repo) => {
             setGithubPushOpen(false);
             runAction(async () => {
-              await api.addRemote(repoPath, "origin", repo.clone_url);
+              const sshStatus = await api.sshStatus();
+              await api.addRemote(repoPath, "origin", preferredCloneUrl(repo, sshStatus));
               await refreshAll();
               if (!status?.branch) throw new Error("No current branch");
               await api.push(repoPath, "origin", status.branch, true);
