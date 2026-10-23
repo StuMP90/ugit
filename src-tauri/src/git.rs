@@ -67,6 +67,17 @@ fn remote_callbacks<'a>(custom_key: Option<PathBuf>) -> git2::RemoteCallbacks<'a
             "No valid credentials found (tried ssh-agent, ~/.ssh keys, signed-in GitHub account, and git credential helper)",
         ))
     });
+    // A successful `push()` only means the network round-trip completed —
+    // the remote can still reject individual ref updates (non-fast-forward,
+    // branch protection, a rejected hook, ...), which is reported solely
+    // through this callback. Without it, a rejected push is indistinguishable
+    // from a real one and gets reported to the user as success.
+    cb.push_update_reference(|refname, status| match status {
+        Some(msg) => Err(git2::Error::from_str(&format!(
+            "GitHub rejected the push of {refname}: {msg}"
+        ))),
+        None => Ok(()),
+    });
     cb
 }
 
